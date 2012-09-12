@@ -4,6 +4,7 @@
 - fixed: rare race condition could raise ArgumentError inside Mutex#lock()
 - fixed: Mutex.stop_watching raised MutexError after changing internal state
 - fixed: semaphores spec updated
+- fixed: ruby-1.9.1 has no SecureRandom.uuid method
 
 0.1.0
 - first release
