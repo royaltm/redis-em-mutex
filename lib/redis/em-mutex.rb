@@ -20,6 +20,8 @@ class Redis
     class Mutex
       VERSION = '0.1.1'
 
+      autoload :Macro, 'redis/em-mutex/macro'
+
       module Errors
         class MutexError < RuntimeError; end
         class MutexTimeout < MutexError; end
