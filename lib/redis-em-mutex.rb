@@ -1,5 +1,5 @@
 class Redis
   module EM
-    autoload :Mutex, 'em-synchrony/redis/em-mutex'
+    autoload :Mutex, 'redis/em-mutex'
   end
 end
