@@ -475,11 +475,11 @@ class Redis
         # MutexError to be raised in waiting fibers.
         def stop_watcher(force = false)
           return unless @@watching == $$
-          @@watching = false
           raise MutexError, "call #{self.class}::setup first" unless @@redis_watcher
           unless @@signal_queue.empty? || force
             raise MutexError, "can't stop: active signal queue handlers"
           end
+          @@watching = false
           if @@watcher_subscribed
             @@redis_watcher.unsubscribe SIGNAL_QUEUE_CHANNEL
             while @@watcher_subscribed
