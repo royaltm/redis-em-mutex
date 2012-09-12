@@ -8,28 +8,19 @@ require 'redis'
 
 class Redis
   module EM
+    # Cross Machine-Process-Fiber EventMachine/Redis based semaphore.
+    #
+    # WARNING:
+    #
+    # Methods of this class are NOT thread-safe.
+    # They are machine/process/fiber-safe.
+    # All method calls must be invoked only from EventMachine's reactor thread.
+    #
+    # - The terms "lock" and "semaphore" used in documentation are synonims.
+    # - The term "owner" denotes a Ruby Fiber in some Process on some Machine.
+    #
     class Mutex
-      # Cross Machine-Process-Fiber EventMachine/Redis based semaphore.
-      #
-      # WARNING:
-      #   Methods of this class are NOT thread-safe.
-      #   They are machine/process/fiber-safe.
-      #   All method calls must be invoked only from EventMachine's reactor thread.
-      #
-      # * The terms "lock" and "semaphore" used in documentation are synonims.
-      # * The term "owner" denotes a Ruby Fiber in some Process on some Machine.
-      #
-      # This implementation:
-      #
-      # * allows for multiple semaphores (all-or-nothing) locking
-      #   (to prevent possible dead-locks when multiple semaphores are required to be locked at once)
-      # * is designed especially for EventMachine
-      # * is best served with EM-Synchrony (uses EM::Synchrony::ConnectionPool)
-      # * doesn't do CPU-intensive sleep/polling while waiting for lock to be available;
-      #   instead Fibers waiting for the lock are signalled as soon as the lock has been released
-      # * is fiber-safe
-      # * is NOT thread-safe
-      #
+      VERSION = '0.1.0'
       module Errors
         class MutexError < RuntimeError; end
         class MutexTimeout < MutexError; end
@@ -61,16 +52,16 @@ class Redis
         alias_method :namespace, :ns
         # Creates a new namespace (Mutex factory).
         #
-        # ns = namespace
-        # opts = options hash
-        #   :block - default block timeout
-        #   :expire - default expire timeout
+        # - ns = namespace
+        # - opts = options hash:
+        # - :block - default block timeout
+        # - :expire - default expire timeout
         def initialize(ns, opts = {})
           @ns = ns
           @opts = (opts || {}).merge(:ns => ns)
         end
 
-        # Creates namespaced cross machine/process/fiber semaphore.
+        # Creates a namespaced cross machine/process/fiber semaphore.
         #
         # for arguments see: Redis::EM::Mutex.new
         def new(*args)
@@ -100,14 +91,14 @@ class Redis
 
       # Creates a new cross machine/process/fiber semaphore
       #
-      # Redis::EM::Mutex.new(*names, opts = {})
+      #   Redis::EM::Mutex.new(*names, opts = {})
       #
-      # *names = lock identifiers - if none they are auto generated
-      # opts = options hash
-      #   - :name - same as *names (in case *names arguments were omitted)
-      #   - :block - default block timeout
-      #   - :expire - default expire timeout
-      #   - :ns - local namespace (otherwise global namespace is used)
+      # - *names = lock identifiers - if none they are auto generated
+      # - opts = options hash:
+      # - :name - same as *names (in case *names arguments were omitted)
+      # - :block - default block timeout
+      # - :expire - default expire timeout (see: Mutex#lock and Mutex#try_lock)
+      # - :ns - local namespace (otherwise global namespace is used)
       def initialize(*args)
         raise MutexError, "call #{self.class}::setup first" unless @@redis_pool
 
@@ -148,8 +139,8 @@ class Redis
       # Use Mutex#expire_timeout= to set custom lock expiration time in secods.
       # Otherwise global Mutex.default_expire is used.
       #
-      # This method does not obtains expired semaphores.
-      # Use Mutex#lock with block_timeout = 0 to obtain expired lock.
+      # This method does not lock expired semaphores.
+      # Use Mutex#lock with block_timeout = 0 to obtain expired lock without blocking.
       def try_lock
         lock_id = (Time.now + (@expire_timeout.to_f.nonzero? || @@default_expire)).to_f.to_s
         !!if @multi
@@ -231,7 +222,7 @@ class Redis
         queues = names.map {|n| @@signal_queue[n] << handler }
         ident_match = owner_ident
         until try_lock
-          raise MutexError, "can't lock: watcher is down" unless @@watching == $$
+          Mutex.start_watcher unless @@watching == $$
           start_time = Time.now.to_f
           expire_time = nil
           @@redis_pool.execute(false) do |r|
@@ -296,7 +287,7 @@ class Redis
       def synchronize(block_timeout = nil)
         if lock(block_timeout)
           begin
-            yield
+            yield self
           ensure
             unlock
           end
@@ -311,44 +302,48 @@ class Redis
         alias_method :namespace, :ns
         alias_method :'namespace=', :'ns='
         
-        # Default value of semaphore expiration timeout in seconds.
+        # Default value of expiration timeout in seconds.
         def default_expire; @@default_expire; end
         
-        # Assigns default value of semaphore expiration timeout in seconds.
+        # Assigns default value of expiration timeout in seconds.
         # Must be > 0.
         def default_expire=(value); @@default_expire=value.to_f.abs; end
 
         # Setup redis database and other defaults
         # MUST BE called once before any semaphore is created.
+        #
         # opts = options Hash:
-        #  - global options:
-        #  - :connection_pool_class - default is ::EM::Synchrony::ConnectionPool
-        #  - :expire   - sets global Mutex.default_expire 
-        #  - :ns       - sets global Mutex.namespace
-        #  - :reconnect_max - maximum num. of attempts to re-establish
-        #    connection to redis server;
-        #    default is 10; set to 0 to disable re-connecting;
-        #    set to -1 to attempt forever
         #
-        #  - redis connection options:
-        #  - :size     - redis connection pool size
+        # global options:
         #
-        #  - passed directly to Redis.new:
+        # - :connection_pool_class - default is ::EM::Synchrony::ConnectionPool
+        # - :expire   - sets global Mutex.default_expire 
+        # - :ns       - sets global Mutex.namespace
+        # - :reconnect_max - maximum num. of attempts to re-establish
+        #   connection to redis server;
+        #   default is 10; set to 0 to disable re-connecting;
+        #   set to -1 to attempt forever
         #
-        #  - :url      - redis server url
+        # redis connection options:
         #
-        #  or
+        # - :size     - redis connection pool size
         #
-        #  - :scheme   - "redis" or "unix"
-        #  - :host     - redis host
-        #  - :port     - redis port
-        #  - :password - redis password
-        #  - :db       - redis database number
-        #  - :path     - redis unix-socket path
+        # passed directly to Redis.new:
         #
-        #  or
+        # - :url      - redis server url
         #
-        #  - :redis    - initialized ConnectionPool of Redis clients.
+        # or
+        #
+        # - :scheme   - "redis" or "unix"
+        # - :host     - redis host
+        # - :port     - redis port
+        # - :password - redis password
+        # - :db       - redis database number
+        # - :path     - redis unix-socket path
+        #
+        # or
+        #
+        # - :redis    - initialized ConnectionPool of Redis clients.
         def setup(opts = {})
           stop_watcher
           opts = OpenStruct.new(opts)
@@ -414,7 +409,7 @@ class Redis
           end
         end
 
-        # Initializes the "unlock" channel watcher. It's called by Mutex.setup
+        # Initializes the "unlock" channel watcher. Its called by Mutex.setup
         # internally. Should not be used under normal circumstances.
         # If EventMachine is to be re-started (or after EM.fork_reactor) this method may be used instead of
         # Mutex.setup for "lightweight" startup procedure.
@@ -514,15 +509,14 @@ class Redis
         # Returns instance of Redis::EM::Mutex if lock was successfully obtained.
         # Returns `nil` if lock wasn't available within `:block` seconds.
         #
-        # Redis::EM::Mutex.lock(*names, opts = {})
+        #   Redis::EM::Mutex.lock(*names, opts = {})
         #
-        # *names = lock identifiers - if none they are auto generated
-        # opts = options hash
-        #   - :name - same as name (in case names argument were omitted)
-        #   - :block - block timeout
-        #   - :expire - expire timeout (see: #lock and #try_lock)
-        #   - :ns - namespace (otherwise global namespace is used)
-        # 
+        # - *names = lock identifiers - if none they are auto generated
+        # - opts = options hash:
+        # - :name - same as name (in case *names arguments were omitted)
+        # - :block - block timeout
+        # - :expire - expire timeout (see: Mutex#lock and Mutex#try_lock)
+        # - :ns - namespace (otherwise global namespace is used)
         def lock(*args)
           mutex = new(*args)
           mutex if mutex.lock
@@ -530,14 +524,14 @@ class Redis
         # Execute block of code protected with named semaphore.
         # Returns result of code block.
         #
-        # Redis::EM::Mutex.synchronize(*names, opts = {}, &block)
+        #   Redis::EM::Mutex.synchronize(*names, opts = {}, &block)
         # 
-        # *names = lock identifiers - if none they are auto generated
-        # opts = options hash
-        #   - :name - same as name (in case names argument were omitted)
-        #   - :block - block timeout
-        #   - :expire - expire timeout (see: #lock and #try_lock)
-        #   - :ns - namespace (otherwise global namespace is used)
+        # - *names = lock identifiers - if none they are auto generated
+        # - opts = options hash:
+        # - :name - same as name (in case *names arguments were omitted)
+        # - :block - block timeout
+        # - :expire - expire timeout (see: Mutex#lock and Mutex#try_lock)
+        # - :ns - namespace (otherwise global namespace is used)
         # 
         # If `:block` is set and lock isn't obtained within `:block` seconds this method raises
         # MutexTimeout.

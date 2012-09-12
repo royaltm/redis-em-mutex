@@ -281,7 +281,6 @@ describe Redis::EM::Mutex do
     ::EM.fork_reactor do
       Fiber.new do
         begin
-          described_class.start_watcher
           redis = Redis.new @redis_options
           redis.set time_key1, Time.now.to_f.to_s
           mutex.synchronize do
@@ -315,7 +314,6 @@ describe Redis::EM::Mutex do
     @after_em_stop = nil
     ::EM.synchrony do
       begin
-        described_class.start_watcher
         testcase.call
       ensure
         described_class.stop_watcher(false)
