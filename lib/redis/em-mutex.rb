@@ -369,8 +369,11 @@ class Redis
           self.default_expire = opts.expire if opts.expire
           @@connection_retry_max = opts.reconnect_max.to_i if opts.reconnect_max
           @@ns = namespace if namespace
-          @@uuid = SecureRandom.uuid
-
+          @@uuid = if SecureRandom.respond_to?(:uuid)
+            SecureRandom.uuid
+          else
+            SecureRandom.base64(24)
+          end
           unless (@@redis_pool = redis)
             unless @@connection_pool_class
               begin
