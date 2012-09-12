@@ -1,6 +1,4 @@
 # -*- coding: UTF-8 -*-
-# require 'digest'
-# require 'base64'
 require 'ostruct'
 require 'securerandom'
 require 'redis/connection/synchrony' unless defined? Redis::Connection::Synchrony
@@ -8,7 +6,7 @@ require 'redis'
 
 class Redis
   module EM
-    # Cross Machine-Process-Fiber EventMachine/Redis based semaphore.
+    # Cross machine-process-fiber EventMachine + Redis based semaphore.
     #
     # WARNING:
     #
@@ -20,7 +18,8 @@ class Redis
     # - The term "owner" denotes a Ruby Fiber in some Process on some Machine.
     #
     class Mutex
-      VERSION = '0.1.0'
+      VERSION = '0.1.1'
+
       module Errors
         class MutexError < RuntimeError; end
         class MutexTimeout < MutexError; end
@@ -109,7 +108,7 @@ class Redis
         raise MutexError, "semaphore names must not be empty" if @names.empty?
         @multi = !@names.one?
         @ns = opts[:ns] || @@ns
-        @ns_names = @ns ? @names.map {|n| "#@ns:#@n" } : @names
+        @ns_names = @ns ? @names.map {|n| "#@ns:#{n}".freeze }.freeze : @names.map {|n| n.to_s.dup.freeze }.freeze
         @expire_timeout = opts[:expire]
         @block_timeout = opts[:block]
         @locked_id = nil
@@ -249,7 +248,7 @@ class Redis
               end
             end
           end
-          timeout = expire_time.to_f - start_time
+          timeout = (expire_time = expire_time.to_f) - start_time
           timeout = block_timeout if block_timeout && block_timeout < timeout
 
           if !try_again && timeout > 0
