@@ -26,7 +26,7 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
 * only for EventMachine
 * NOT thread-safe
 * locking order between concurrent processes is undetermined (no FIFO)
-* its not nifty, rather somewhat complicated
+* it's not nifty, rather somewhat complicated
 
 == REQUIREMENTS
 

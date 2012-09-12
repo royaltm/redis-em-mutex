@@ -277,6 +277,7 @@ class Redis
       end
 
       # Execute block of code protected with semaphore.
+      # Code block receives mutex object.
       # Returns result of code block.
       #
       # If `block_timeout` or Mutex#block_timeout is set and
@@ -402,7 +403,7 @@ class Redis
           end
         end
 
-        # Initializes the "unlock" channel watcher. Its called by Mutex.setup
+        # Initializes the "unlock" channel watcher. It's called by Mutex.setup
         # internally. Should not be used under normal circumstances.
         # If EventMachine is to be re-started (or after EM.fork_reactor) this method may be used instead of
         # Mutex.setup for "lightweight" startup procedure.
