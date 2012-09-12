@@ -323,7 +323,7 @@ describe Redis::EM::Mutex do
       begin
         testcase.call
         raise @exception if @exception
-        described_class.stop_watcher(false)
+        described_class.stop_watcher
       rescue => e
         described_class.stop_watcher(true)
         raise e
@@ -335,7 +335,7 @@ describe Redis::EM::Mutex do
   end
 
   before(:all) do
-    @redis_options = {}
+    @redis_options = {:driver => :synchrony}
     described_class.setup @redis_options.merge(size: 11)
     @lock_names = 10.times.map {
       SecureRandom.random_bytes

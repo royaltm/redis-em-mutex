@@ -100,7 +100,7 @@ describe Redis::EM::Mutex do
   end
 
   before(:all) do
-    @redis_options = {}
+    @redis_options = {:driver => :synchrony}
     described_class.setup @redis_options.merge(size: 11)
     @lock_names = 10.times.map {
       SecureRandom.random_bytes

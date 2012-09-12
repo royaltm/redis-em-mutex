@@ -6,7 +6,9 @@ $gem_name = "redis-em-mutex"
 
 desc "Run spec tests"
 task :test do
-  sh "rspec spec/*.rb"
+  Dir["spec/#{$gem_name}-*.rb"].each do |spec|
+    sh "rspec #{spec}"
+  end
 end
 
 desc "Build the gem"
