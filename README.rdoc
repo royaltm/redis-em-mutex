@@ -41,7 +41,7 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
 
 ==== Gemfile
 
-  gem "redis-em-mutex", "~> 0.1.0"
+  gem "redis-em-mutex", "~> 0.1.1"
 
 ==== Github
 
