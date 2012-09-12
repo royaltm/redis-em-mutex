@@ -2,7 +2,7 @@ $:.unshift "lib"
 
 task :default => [:test]
 
-$gem_name = "ruby-em-mutex"
+$gem_name = "redis-em-mutex"
 
 desc "Run spec tests"
 task :test do
