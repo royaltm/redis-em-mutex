@@ -1,3 +1,6 @@
+upcoming
+- features macro-style definitions
+
 0.1.1
 - fixed: namespaces didn't work
 - added namespaces spec
