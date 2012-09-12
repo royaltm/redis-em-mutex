@@ -2,7 +2,7 @@
 - fixed: namespaces didn't work
 - added namespaces spec
 - fixed: rare race condition could raise ArgumentError inside Mutex#lock()
-- fixed: Mutes.stop_watching raised MutexError after changing internal state
+- fixed: Mutex.stop_watching raised MutexError after changing internal state
 - fixed: semaphores spec updated
 
 0.1.0
