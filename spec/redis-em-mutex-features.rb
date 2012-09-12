@@ -1,6 +1,6 @@
 $:.unshift "lib"
 require 'em-synchrony'
-require 'redis/em-mutex'
+require 'redis-em-mutex'
 
 describe Redis::EM::Mutex do
 

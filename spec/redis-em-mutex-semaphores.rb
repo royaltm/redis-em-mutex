@@ -2,7 +2,7 @@ $:.unshift "lib"
 require 'securerandom'
 require 'em-synchrony'
 require 'em-synchrony/fiber_iterator'
-require 'redis/em-mutex'
+require 'redis-em-mutex'
 
 describe Redis::EM::Mutex do
 
