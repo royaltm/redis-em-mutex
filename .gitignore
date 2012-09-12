@@ -1,0 +1,7 @@
+Thumbs.db
+*.tmp
+*~
+/*.lnk
+/*.sublime-project
+/*.sublime-workspace
+sftp-config.json
