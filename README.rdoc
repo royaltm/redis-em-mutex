@@ -140,6 +140,54 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
     EM.stop
   end
 
+=== Macro-style definition
+
+Borrowed from [kenn/redis-mutex](http://github.com/kenn/redis-mutex).
+Add-on to protect instance methods of a class with a mutex.
+The locking scope will be Mutex global namespace + class name + method name.
+
+  class TheClass
+    include Redis::EM::Mutex::Macro
+  
+    auto_mutex
+    def critical_run
+      ... do some critical stuff
+      ....only one fiber in one process on one machine is executing this instance method of any instance of defined class
+    end
+
+    auto_mutex expire: 100, ns: '**TheClass**'
+    # all critical methods defined later will inherit above options unless overridden
+  
+    auto_mutex # start and stop will be protected
+    def start
+      ...
+    end
+
+    def stop
+      ...
+    end
+
+    no_auto_mutex
+    def some_unprotected_method
+      ...
+    end
+
+    auto_mutex :run_long, expire: 100000, block: 10, on_timeout: :cant_run
+    def run_long
+      ...
+    end
+
+    def cant_run
+      ...
+    end
+
+    def foo
+      ...
+    end
+    auto_mutex :foo, block: 0, on_timeout: proc { puts 'bar!' }
+
+  end
+
 === Advanced
 
   mutex = Redis::EM::Mutex.new('resource1', 'resource2', expire: 60)
