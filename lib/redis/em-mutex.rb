@@ -369,14 +369,6 @@ class Redis
           self.default_expire = opts.expire if opts.expire
           @@connection_retry_max = opts.reconnect_max.to_i if opts.reconnect_max
           @@ns = namespace if namespace
-          # generate machine uuid
-          # todo: should probably use NIC ethernet address or uuid gem
-          # dhash = ::Digest::SHA1.new
-          # rnd = Random.new
-          # 256.times { dhash.update [rnd.rand(0x100000000)].pack "N" }
-          # digest = dhash.digest
-          # dsize, doffs = digest.bytesize.divmod 6
-          # @@uuid = Base64.encode64(digest[rnd.rand(doffs + 1), dsize * 6]).chomp
           @@uuid = SecureRandom.uuid
 
           unless (@@redis_pool = redis)
