@@ -275,7 +275,6 @@ class Redis
         timer = nil
         queues.each {|q| q.delete handler }
         names.each {|n| @@signal_queue.delete(n) if @@signal_queue[n].empty? }
-        @@signal_queue.inspect
       end
 
       # Execute block of code protected with semaphore.
