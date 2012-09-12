@@ -6,7 +6,7 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
 
 == DESCRIPTION
 
-*redis-em-mutex* is the Cross Server-Process-Fiber EventMachine/Redis based semaphore.
+*redis-em-mutex* is the cross server-process-fiber EventMachine + Redis based semaphore.
 
 == FEATURES
 
