@@ -102,6 +102,7 @@ class Redis
       # - :block - default block timeout
       # - :expire - default expire timeout (see: Mutex#lock and Mutex#try_lock)
       # - :ns - local namespace (otherwise global namespace is used)
+      # - :owner - custom owner definition instead of Fiber#__id__
       def initialize(*args)
         raise MutexError, "call #{self.class}::setup first" unless @@redis_pool
 
@@ -116,6 +117,15 @@ class Redis
         @expire_timeout = opts[:expire]
         @block_timeout = opts[:block]
         @locked_id = nil
+        if (owner = opts[:owner])
+          self.define_singleton_method(:owner_ident) do |lock_id = nil|
+            if lock_id
+              "#@@uuid$#$$@#{owner} #{lock_id}"
+            else
+              "#@@uuid$#$$@#{owner}"
+            end
+          end
+        end
       end
 
       # Returns `true` if this semaphore (at least one of locked `names`) is currently being held by some owner.
@@ -538,8 +548,6 @@ class Redis
           new(*args).synchronize(&block)
         end
       end
-
-      private
 
       def owner_ident(lock_id = nil)
         if lock_id
