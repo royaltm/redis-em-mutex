@@ -32,8 +32,8 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
 == REQUIREMENTS
 
 * ruby >= 1.9 (tested: 1.9.3-p194, 1.9.2-p320, 1.9.1-p378)
-* http://github.com/redis/redis-rb >= 3.0.1
-* http://rubyeventmachine.com >= 0.12.10
+* http://github.com/redis/redis-rb ~> 3.0.1
+* http://rubyeventmachine.com ~> 1.0.0
 * (optional) http://github.com/igrigorik/em-synchrony
 
 == INSTALL

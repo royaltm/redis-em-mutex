@@ -18,11 +18,11 @@ Gem::Specification.new do |s|
     "--main" << "README.rdoc"
   s.has_rdoc = true
   s.extra_rdoc_files = ["README.rdoc"]
-  s.requirements << "Redis server"
-  s.add_runtime_dependency "redis", ">= 3.0.0"
+  s.requirements << "Redis server 2.4+"
+  s.add_runtime_dependency "redis", ">= 3.0.1"
   s.add_runtime_dependency "hiredis", "~> 0.4.5"
-  s.add_runtime_dependency "eventmachine", ">= 0.12.10"
+  s.add_runtime_dependency "eventmachine", "~> 1.0.0"
   s.add_development_dependency "rspec", "~> 2.8.0"
-  s.add_development_dependency "eventmachine", ">= 1.0.0.beta.1"
+  s.add_development_dependency "eventmachine", "~> 1.0.0"
   s.add_development_dependency "em-synchrony", "~> 1.0.0"
 end
