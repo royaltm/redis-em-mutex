@@ -362,7 +362,7 @@ class Redis
             }.reject {|_k, v| v.nil?})
           end
           if (redis = opts.redis) && !opts.url
-            redis_updater.call redis
+            redis_updater.call redis.client
           elsif opts.url
             redis_options[:url] = opts.url
           end
