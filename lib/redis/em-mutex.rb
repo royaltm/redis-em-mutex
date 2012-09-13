@@ -3,6 +3,7 @@ require 'ostruct'
 require 'securerandom'
 require 'redis/connection/synchrony' unless defined? Redis::Connection::Synchrony
 require 'redis'
+require 'redis/em-mutex/version'
 
 class Redis
   module EM
@@ -20,7 +21,6 @@ class Redis
     #   possessing exclusively a named semaphore(s).
     #
     class Mutex
-      VERSION = '0.1.2'
 
       autoload :Macro, 'redis/em-mutex/macro'
 

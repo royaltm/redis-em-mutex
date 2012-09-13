@@ -1,5 +1,5 @@
 $:.unshift "lib"
-require 'redis/em-mutex'
+require 'redis/em-mutex/version'
 
 Gem::Specification.new do |s|
   s.name = "redis-em-mutex"
