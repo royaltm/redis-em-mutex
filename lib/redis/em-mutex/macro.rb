@@ -35,16 +35,17 @@ class Redis
           # options are:
           # - :expire - see Mutex.new
           # - :block  - see Mutex.new
-          # - :ns     - custom namespace, normally name of a class that includes Macro is used
-          # - :on_timeout - if defined, this proc will be called instead of raising MutexTimeout error
+          # - :ns     - custom namespace, if not present name of the class that includes Macro is used
+          # - :on_timeout - if defined, this proc/method will be called instead of raising MutexTimeout error
           #
-          # If method_names are provided (already defined or defined in the future)
+          # If method_names are provided (names of already defined methods or defined in the future)
           # they become protected with mutex.
           #
-          # If only options are provided, they become default for subsequent auto_mutex calls.
+          # If options are provided wihout method_names, they will become default options
+          # for subsequent auto_mutex calls.
           #
-          # If auto_mutex has no arguments then any further defined method will be protected.
-          # To disable auto_mutex call no_auto_mutex.
+          # If auto_mutex is called without arguments then any method further defined will also be protected.
+          # To disable implicit auto_mutex use no_auto_mutex.
           def auto_mutex(*args)
             options = args.last.kind_of?(Hash) ? args.pop : {}
             if args.each {|target|
@@ -59,7 +60,9 @@ class Redis
             end
           end
 
-          # any subsequent methods won't be protected with mutex
+          # Switch off implicit auto_mutex.
+          # After calling no_auto_mutex if any new method is defined it won't be protected
+          # unless explicitely specified with auto_mutex.
           def no_auto_mutex
             self.auto_mutex_enabled = false
           end
