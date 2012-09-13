@@ -18,7 +18,7 @@ class Redis
     # - The term "owner" denotes a Ruby Fiber in some Process on some Machine.
     #
     class Mutex
-      VERSION = '0.1.1'
+      VERSION = '0.1.2'
 
       autoload :Macro, 'redis/em-mutex/macro'
 

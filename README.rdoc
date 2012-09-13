@@ -20,6 +20,7 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
 * fiber-safe
 * deadlock detection (only trivial cases: locking twice the same resource from the same fiber)
 * mandatory lock expiration (with refreshing)
+* macro-style definitions (Mutex::Macro mixin)
 
 == BUGS/LIMITATIONS
 
@@ -41,7 +42,7 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
 
 ==== Gemfile
 
-  gem "redis-em-mutex", "~> 0.1.1"
+  gem "redis-em-mutex", "~> 0.1.2"
 
 ==== Github
 
@@ -100,7 +101,7 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
 
   EM.synchrony do
     ns.synchronize('foo') do
-      .... do something with foo and bar
+      .... do something with foo
     end
     ...
     EM.stop
@@ -142,8 +143,8 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
 
 === Macro-style definition
 
-Borrowed from [kenn/redis-mutex](http://github.com/kenn/redis-mutex).
-Add-on to protect instance methods of a class with a mutex.
+Borrowed from http://github.com/kenn/redis-mutex.
+Redis::EM::Mutex::Macro is a mixin which protects selected instance methods of a class with a mutex.
 The locking scope will be Mutex global namespace + class name + method name.
 
   class TheClass

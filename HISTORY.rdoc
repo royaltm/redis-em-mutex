@@ -1,5 +1,8 @@
-upcoming
+0.1.2
 - features macro-style definitions
+- fixed: setup with :redis
+- added macros spec
+- added more setup features spec
 
 0.1.1
 - fixed: namespaces didn't work
