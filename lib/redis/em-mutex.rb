@@ -13,9 +13,11 @@ class Redis
     # Methods of this class are NOT thread-safe.
     # They are machine/process/fiber-safe.
     # All method calls must be invoked only from EventMachine's reactor thread.
+    # Wrap mutex calls in EventMachine.shedule from non-reactor threads.
     #
     # - The terms "lock" and "semaphore" used in documentation are synonims.
-    # - The term "owner" denotes a Ruby Fiber in some Process on some Machine.
+    # - The term "owner" denotes a Ruby Fiber executing code in the scope of Machine/Process/Fiber
+    #   possessing exclusively a named semaphore(s).
     #
     class Mutex
       VERSION = '0.1.2'
@@ -127,7 +129,8 @@ class Redis
         end
       end
 
-      # Returns `true` if this semaphore (all the locked `names`) is currently being held by calling fiber.
+      # Returns `true` if this semaphore (all the locked `names`) is currently being held by calling fiber
+      # (if executing fiber is the owner).
       def owned?
         !!if @locked_id
           lock_full_ident = owner_ident(@locked_id)
