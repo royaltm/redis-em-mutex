@@ -322,6 +322,9 @@ class Redis
         fiber.resume if @slept.delete(fiber)
       end
 
+      # for compatibility with EventMachine::Synchrony::Thread::ConditionVariable
+      alias_method :_wakeup, :wakeup
+
       # Releases the lock and sleeps `timeout` seconds if it is given and non-nil or forever.
       # Raises MutexError if mutex wasn’t locked by the current owner.
       # Raises MutexTimeout if #block_timeout= was set and timeout
