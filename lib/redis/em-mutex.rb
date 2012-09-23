@@ -71,7 +71,7 @@ class Redis
       # - :block - default block timeout
       # - :expire - default expire timeout (see: Mutex#lock and Mutex#try_lock)
       # - :ns - local namespace (otherwise global namespace is used)
-      # - :owner - custom owner definition instead of Fiber#__id__
+      # - :owner - owner definition instead of Fiber#__id__
       def initialize(*args)
         raise MutexError, "call #{self.class}::setup first" unless @@redis_pool
 
@@ -158,7 +158,7 @@ class Redis
 
       # Attempts to obtain the lock and returns immediately.
       # Returns `true` if the lock was granted.
-      # Use Mutex#expire_timeout= to set custom lock expiration time in secods.
+      # Use Mutex#expire_timeout= to set lock expiration time in secods.
       # Otherwise global Mutex.default_expire is used.
       #
       # This method does not lock expired semaphores.

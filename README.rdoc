@@ -214,7 +214,7 @@ in place of EventMachine::Synchrony::Thread::Mutex.
 
 === Advanced
 
-==== Custom owner
+==== Customized owner
 
 In some cases you might want to extend the ownership of a locked semaphore beyond the current fiber.
 That is to be able to "share" a locked semaphore between group of fibers associated with some external resource.
