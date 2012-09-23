@@ -126,7 +126,7 @@ class Redis
         @ns_names = @ns ? @names.map {|n| "#@ns:#{n}".freeze }.freeze : @names.map {|n| n.to_s.dup.freeze }.freeze
         self.expire_timeout = opts[:expire] if opts.key?(:expire)
         self.block_timeout = opts[:block] if opts.key?(:block)
-        @locked_id = nil
+        @locked_owner_id = @locked_id = nil
         if (owner = opts[:owner])
           self.define_singleton_method(:owner_ident) do |lock_id = nil|
             if lock_id
@@ -152,10 +152,48 @@ class Redis
       # Returns `true` if this semaphore (all the locked `names`) is currently being held by calling fiber
       # (if executing fiber is the owner).
       def owned?
-        !!if @locked_id
-          lock_full_ident = owner_ident(@locked_id)
+        !!if @locked_id && owner_ident(@locked_id) == (lock_full_ident = @locked_owner_id)
           @@redis_pool.mget(*@ns_names).all? {|v| v == lock_full_ident}
         end
+      end
+
+      # Returns `true` when the semaphore is being held and have already expired.
+      # Returns `false` when the semaphore is still locked and valid
+      # or `nil` if the semaphore wasn't locked.
+      #
+      # The check is performed only on the Mutex object instance and can only be used as a hint.
+      # For reliable lock status information use #refresh or #owned? instead.
+      def expired?
+        return Time.now.to_f > @locked_id.to_f if @locked_id && owner_ident(@locked_id) == @locked_owner_id
+      end
+
+      # When the semaphore is being held returns number of seconds left until the semaphore expires.
+      # The number of seconds less than 0 means that the semaphore expired and can be re-captured
+      # by some other owner.
+      # Returns `nil` if the semaphore wasn't locked.
+      #
+      # The check is performed only on the Mutex object instance and can only be used as a hint.
+      # For reliable lock status information use #refresh or #owned? instead.
+      def expires_in
+        return @locked_id.to_f - Time.now.to_f if @locked_id && owner_ident(@locked_id) == @locked_owner_id
+      end
+
+      # When the semaphore is being held returns local time at which the semaphore expires.
+      # Returns `nil` if the semaphore wasn't locked.
+      #
+      # The check is performed only on the Mutex object instance and can only be used as a hint.
+      # For reliable lock status information use #refresh or #owned? instead.
+      def expires_at
+        Time.at(@locked_id.to_f) if @locked_id && owner_ident(@locked_id) == @locked_owner_id
+      end
+
+      # When the semaphore is being held returns timestamp at which the semaphore expires.
+      # Returns `nil` if the semaphore wasn't locked.
+      #
+      # The check is performed only on the Mutex object instance and can only be used as a hint.
+      # For reliable lock status information use #refresh or #owned? instead.
+      def expiration_timestamp
+        @locked_id.to_f if @locked_id && owner_ident(@locked_id) == @locked_owner_id
       end
 
       # Attempts to obtain the lock and returns immediately.
@@ -167,33 +205,37 @@ class Redis
       # Use Mutex#lock with block_timeout = 0 to obtain expired lock without blocking.
       def try_lock
         lock_id = (Time.now + expire_timeout).to_f.to_s
+        lock_full_ident = owner_ident(lock_id)
         !!if @multi
-          lock_full_ident = owner_ident(lock_id)
           if @@redis_pool.msetnx(*@ns_names.map {|k| [k, lock_full_ident]}.flatten)
             @locked_id = lock_id
+            @locked_owner_id = lock_full_ident
           end
-        elsif @@redis_pool.setnx(@ns_names.first, owner_ident(lock_id))
+        elsif @@redis_pool.setnx(@ns_names.first, lock_full_ident)
           @locked_id = lock_id
+          @locked_owner_id = lock_full_ident
         end
       end
 
       # Refreshes lock expiration timeout.
-      # Returns true if refresh was successfull or false if mutex was not locked or has already expired.
+      # Returns `true` if refresh was successfull or `nil` if semaphore wasn't locked.
+      # When semaphore was locked but has already expired and was re-captured returns `false`.
       def refresh(expire_timeout=nil)
-        ret = false
-        if @locked_id
+        ret = nil
+        if @locked_id && owner_ident(@locked_id) == (lock_full_ident = @locked_owner_id)
           new_lock_id = (Time.now + (expire_timeout.to_f.nonzero? || self.expire_timeout)).to_f.to_s
           new_lock_full_ident = owner_ident(new_lock_id)
-          lock_full_ident = owner_ident(@locked_id)
           @@redis_pool.execute(false) do |r|
             r.watch(*@ns_names) do
-              if r.mget(*@ns_names).all? {|v| v == lock_full_ident}
-                ret = !!r.multi do |multi|
-                  multi.mset(*@ns_names.map {|k| [k, new_lock_full_ident]}.flatten)
+              ret = if r.mget(*@ns_names).all? {|v| v == lock_full_ident}
+                if r.multi {|m| m.mset(*@ns_names.map {|k| [k, new_lock_full_ident]}.flatten)}
+                  @locked_id = new_lock_id
+                  @locked_owner_id = new_lock_full_ident
+                  true
                 end
-                @locked_id = new_lock_id if ret
               else
                 r.unwatch
+                false
               end
             end
           end
@@ -201,25 +243,37 @@ class Redis
         ret
       end
 
-      # Releases the lock unconditionally.
-      # If semaphore wasn’t locked by the current owner it is silently ignored.
-      # Returns self.
-      def unlock
-        if @locked_id
-          lock_full_ident = owner_ident(@locked_id)
+      # Releases the lock. Returns self on success.
+      # If the semaphore wasn’t locked returns `nil`.
+      # When the semaphore was locked but expired and was re-captured returns `false`.
+      #
+      # Regardless of the return value the semaphore is always being unlocked by this method.
+      def unlock!
+        ret = nil
+        if @locked_id && owner_ident(@locked_id) == (lock_full_ident = @locked_owner_id)
           @@redis_pool.execute(false) do |r|
             r.watch(*@ns_names) do
-              if r.mget(*@ns_names).all? {|v| v == lock_full_ident}
-                r.multi do |multi|
+              ret = if r.mget(*@ns_names).all? {|v| v == lock_full_ident}
+                !!r.multi do |multi|
                   multi.del(*@ns_names)
                   multi.publish SIGNAL_QUEUE_CHANNEL, Marshal.dump(@ns_names)
                 end
               else
                 r.unwatch
+                false
               end
             end
           end
+          @locked_owner_id = @locked_id = nil
         end
+        ret && self
+      end
+
+      # Releases the lock unconditionally.
+      # If the semaphore wasn’t locked by the current owner it is silently ignored.
+      # Returns self.
+      def unlock
+        unlock!
         self
       end
 
@@ -497,6 +551,7 @@ class Redis
           end
         end
 
+        # EM sleep helper
         def sleep(seconds)
           fiber = Fiber.current
           ::EM::Timer.new(secs) { fiber.resume }
