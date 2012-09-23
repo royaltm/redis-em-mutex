@@ -379,7 +379,7 @@ describe Redis::EM::Mutex do
       mutex.unlock!.should be_nil
       mutex.unlock.should be_an_instance_of described_class
     ensure
-      mutex.unlock
+      mutex.unlock if mutex
     end
   end
 
