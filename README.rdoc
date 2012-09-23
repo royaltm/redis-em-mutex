@@ -18,10 +18,11 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
   multiple semaphores are required to be locked at once)
 * best served with EM-Synchrony (uses EM::Synchrony::ConnectionPool internally)
 * fiber-safe
-* deadlock detection (only trivial cases: locking twice the same resource from the same fiber)
+* deadlock detection (only trivial cases: locking twice the same resource from the same owner)
 * mandatory lock expiration (with refreshing)
 * macro-style definitions (Mutex::Macro mixin)
 * compatible with Synchrony::Thread::ConditionVariable
+* extendable (beyond fibers) mutex ownership
 
 == BUGS/LIMITATIONS
 
@@ -223,12 +224,12 @@ at the same time.
 Of course you could configure some kind of load balancer that distributes your load to do that for you,
 but let's just assume that the load balancer has no such features available.
 
-The default "owner" of a locked semaphore is "Machine uuid" + "process pid" + "fiber id".
-Redis::EM::Mutex allows you to replace the last part of the owner with your own value.
-To customize mutex "owner" you should use :owner option of newly created mutex,
+The default "owner" of a locked semaphore consists of 3 parts: "Machine uuid" + "process pid" + "fiber id".
+Redis::EM::Mutex allows you to replace the last part of the "owner" with your own value.
+To customize mutex's "ownership" you should add :owner option to the created mutex,
 passing some well defined owner id.
 In our case the "scope" of a mutex will be the client's ip address and the "owner id"
-will be an __id__ of EventMachine::Connection object created upon connection from the client.
+will be an __id__ of an EventMachine::Connection object created upon connection from the client.
 This way we make sure that any other connection from the same ip address made to any server and process
 will have different ownership defined. At the same time all the fibers working with that Connection instance
 can access mutex's #refresh and #unlock methods concurrently.
@@ -269,8 +270,9 @@ can access mutex's #refresh and #unlock methods concurrently.
     end
   end
 
-  EventMachine.run {
-    EventMachine.start_server "0.0.0.0", 6969, MutexedConnection
+  EM::Synchrony.run {
+    Redis::EM::Mutex.setup(size: 10, url: 'redis:///1', expire: 600)
+    EM.start_server "0.0.0.0", 6969, MutexedConnection
   }
 
 ==== Forking live
