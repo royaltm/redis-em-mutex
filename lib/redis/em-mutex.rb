@@ -120,6 +120,7 @@ class Redis
 
         @names = args
         @names = Array(opts[:name] || "#{@@name_index.succ!}.lock") if @names.empty?
+        @slept = {}
         raise MutexError, "semaphore names must not be empty" if @names.empty?
         @multi = !@names.one?
         @ns = opts[:ns] || @@ns
@@ -355,6 +356,35 @@ class Redis
           queues.each {|q| q.delete handler }
           names.each {|n| @@signal_queue.delete(n) if @@signal_queue[n].empty? }
         end
+      end
+
+      # Wakes up currently sleeping fiber on a mutex.
+      def wakeup(fiber)
+        fiber.resume if @slept.delete(fiber)
+      end
+
+      # Releases the lock and sleeps `timeout` seconds if it is given and non-nil or forever.
+      # Raises MutexError if mutex wasn’t locked by the current owner.
+      # Raises MutexTimeout if #block_timeout= was set and timeout
+      # occured while locking after sleep.
+      def sleep(timeout = nil)
+        raise MutexError, "can't sleep #{self.class} wasn't locked" unless unlock!
+        start = Time.now
+        current = Fiber.current
+        @slept[current] = true
+        if timeout
+          timer = ::EM.add_timer(timeout) do
+            wakeup(current)
+          end
+          Fiber.yield
+          ::EM.cancel_timer timer
+        else
+          Fiber.yield
+        end
+        @slept.delete current
+        yield if block_given?
+        raise MutexTimeout unless lock
+        Time.now - start
       end
 
       # Execute block of code protected with semaphore.
