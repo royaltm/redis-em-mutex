@@ -21,6 +21,7 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
 * deadlock detection (only trivial cases: locking twice the same resource from the same fiber)
 * mandatory lock expiration (with refreshing)
 * macro-style definitions (Mutex::Macro mixin)
+* compatible with Synchrony::Thread::ConditionVariable
 
 == BUGS/LIMITATIONS
 
@@ -189,7 +190,94 @@ The locking scope will be Mutex global namespace + class name + method name.
 
   end
 
+=== ConditionVariable
+
+Redis::EM::Mutex may be used with EventMachine::Synchrony::Thread::ConditionVariable
+in place of EventMachine::Synchrony::Thread::Mutex.
+
+  mutex = Redis::EM::Mutex.new('resource')
+  resource = EM::Synchrony::Thread::ConditionVariable.new
+  EM::Synchrony.next_tick do
+    mutex.synchronize {
+      # current fiber now needs the resource
+      resource.wait(mutex)
+      # current fiber can now have the resource
+    }
+  end
+  EM::Synchrony.next_tick do
+    mutex.synchronize {
+      # current fiber has finished using the resource
+      resource.signal
+    }
+  end
+
 === Advanced
+
+==== Custom owner
+
+In some cases you might want to extend the ownership of a locked semaphore beyond the current fiber.
+That is to be able to "share" a locked semaphore between group of fibers associated with some external resource.
+
+For example we want to allow only one connection from one ip address to be made to our group of servers
+at the same time.
+Of course you could configure some kind of load balancer that distributes your load to do that for you,
+but let's just assume that the load balancer has no such features available.
+
+The default "owner" of a locked semaphore is "Machine uuid" + "process pid" + "fiber id".
+Redis::EM::Mutex allows you to replace the last part of the owner with your own value.
+To customize mutex "owner" you should use :owner option of newly created mutex,
+passing some well defined owner id.
+In our case the "scope" of a mutex will be the client's ip address and the "owner id"
+will be an __id__ of EventMachine::Connection object created upon connection from the client.
+This way we make sure that any other connection from the same ip address made to any server and process
+will have different ownership defined. At the same time all the fibers working with that Connection instance
+can access mutex's #refresh and #unlock methods concurrently.
+
+  module MutexedConnection
+    def post_init
+      @buffer = ""
+      @mutex = nil
+      ip = Socket.unpack_sockaddr_in(get_peername).last
+      Fiber.new do
+        @mutex = Redis::EM::Mutex.lock(ip, block: 0, owner: self.__id__)
+        if @mutex
+          send_data "Hello #{ip}!"
+          #... initialize stuff
+        else
+          send_data "Duplicate connection not allowed!"
+          close_connection_after_writing
+        end
+      end.resume
+    end
+
+    def unbind
+      if @mutex
+        Fiber.new { @mutex.unlock! }.resume
+      end
+    end
+
+    def receive_data(data)
+      @buffer << data
+      return unless @mutex
+      Fiber.new do
+        if @mutex.refresh # refresh expiration timeout
+          # ... handle data
+        else
+          close_connection_after_writing
+        end
+      end.resume
+    end
+  end
+
+  EventMachine.run {
+    EventMachine.start_server "0.0.0.0", 6969, MutexedConnection
+  }
+
+==== Forking live
+
+You may safely fork process while running event reactor and having locked semaphores.
+The locked semaphores in newly forked process will become unlocked while
+their locked status in parent process will be preserved.
 
   mutex = Redis::EM::Mutex.new('resource1', 'resource2', expire: 60)
 
