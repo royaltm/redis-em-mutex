@@ -46,9 +46,19 @@ class Redis
       @@ns = nil
       @@uuid = nil
 
-      attr_accessor :expire_timeout, :block_timeout
-      attr_reader :names, :ns
+      attr_reader :names, :ns, :block_timeout
       alias_method :namespace, :ns
+
+      def expire_timeout; @expire_timeout || @@default_expire; end
+
+      def expire_timeout=(value)
+        raise ArgumentError, "#{self.class.name}\#expire_timeout value must be greater than 0" unless (value = value.to_f) > 0
+        @expire_timeout = value
+      end
+
+      def block_timeout=(value)
+        @block_timeout = value.nil? ? nil : value.to_f
+      end
 
       class NS
         attr_reader :ns
@@ -114,8 +124,8 @@ class Redis
         @multi = !@names.one?
         @ns = opts[:ns] || @@ns
         @ns_names = @ns ? @names.map {|n| "#@ns:#{n}".freeze }.freeze : @names.map {|n| n.to_s.dup.freeze }.freeze
-        @expire_timeout = opts[:expire]
-        @block_timeout = opts[:block]
+        self.expire_timeout = opts[:expire] if opts.key?(:expire)
+        self.block_timeout = opts[:block] if opts.key?(:block)
         @locked_id = nil
         if (owner = opts[:owner])
           self.define_singleton_method(:owner_ident) do |lock_id = nil|
@@ -156,7 +166,7 @@ class Redis
       # This method does not lock expired semaphores.
       # Use Mutex#lock with block_timeout = 0 to obtain expired lock without blocking.
       def try_lock
-        lock_id = (Time.now + (@expire_timeout.to_f.nonzero? || @@default_expire)).to_f.to_s
+        lock_id = (Time.now + expire_timeout).to_f.to_s
         !!if @multi
           lock_full_ident = owner_ident(lock_id)
           if @@redis_pool.msetnx(*@ns_names.map {|k| [k, lock_full_ident]}.flatten)
@@ -172,7 +182,7 @@ class Redis
       def refresh(expire_timeout=nil)
         ret = false
         if @locked_id
-          new_lock_id = (Time.now + (expire_timeout.to_f.nonzero? || @expire_timeout.to_f.nonzero? || @@default_expire)).to_f.to_s
+          new_lock_id = (Time.now + (expire_timeout.to_f.nonzero? || self.expire_timeout)).to_f.to_s
           new_lock_full_ident = owner_ident(new_lock_id)
           lock_full_ident = owner_ident(@locked_id)
           @@redis_pool.execute(false) do |r|
@@ -225,7 +235,7 @@ class Redis
       # Use Mutex#expire_timeout= to set lock expiration timeout.
       # Otherwise global Mutex.default_expire is used.
       def lock(block_timeout = nil)
-        block_timeout||= @block_timeout
+        block_timeout||= self.block_timeout
         names = @ns_names
         timer = fiber = nil
         try_again = false
@@ -233,62 +243,64 @@ class Redis
           try_again = true
           ::EM.next_tick { fiber.resume if fiber } if fiber
         end
-        queues = names.map {|n| @@signal_queue[n] << handler }
-        ident_match = owner_ident
-        until try_lock
-          Mutex.start_watcher unless @@watching == $$
-          start_time = Time.now.to_f
-          expire_time = nil
-          @@redis_pool.execute(false) do |r|
-            r.watch(*names) do
-              expired_names = names.zip(r.mget(*names)).map do |name, lock_value|
-                if lock_value
-                  owner, exp_id = lock_value.split ' '
-                  exp_time = exp_id.to_f
-                  expire_time = exp_time if expire_time.nil? || exp_time < expire_time
-                  raise MutexError, "deadlock; recursive locking #{owner}" if owner == ident_match
-                  if exp_time < start_time
-                    name
+        begin
+          queues = names.map {|n| @@signal_queue[n] << handler }
+          ident_match = owner_ident
+          until try_lock
+            Mutex.start_watcher unless @@watching == $$
+            start_time = Time.now.to_f
+            expire_time = nil
+            @@redis_pool.execute(false) do |r|
+              r.watch(*names) do
+                expired_names = names.zip(r.mget(*names)).map do |name, lock_value|
+                  if lock_value
+                    owner, exp_id = lock_value.split ' '
+                    exp_time = exp_id.to_f
+                    expire_time = exp_time if expire_time.nil? || exp_time < expire_time
+                    raise MutexError, "deadlock; recursive locking #{owner}" if owner == ident_match
+                    if exp_time < start_time
+                      name
+                    end
                   end
                 end
-              end
-              if expire_time && expire_time < start_time
-                r.multi do |multi|
-                  expired_names = expired_names.compact
-                  multi.del(*expired_names)
-                  multi.publish SIGNAL_QUEUE_CHANNEL, Marshal.dump(expired_names)
+                if expire_time && expire_time < start_time
+                  r.multi do |multi|
+                    expired_names = expired_names.compact
+                    multi.del(*expired_names)
+                    multi.publish SIGNAL_QUEUE_CHANNEL, Marshal.dump(expired_names)
+                  end
+                else
+                  r.unwatch
                 end
-              else
-                r.unwatch
               end
             end
-          end
-          timeout = (expire_time = expire_time.to_f) - start_time
-          timeout = block_timeout if block_timeout && block_timeout < timeout
+            timeout = (expire_time = expire_time.to_f) - start_time
+            timeout = block_timeout if block_timeout && block_timeout < timeout
 
-          if !try_again && timeout > 0
-            timer = ::EM::Timer.new(timeout) do
-              timer = nil
-              ::EM.next_tick { fiber.resume if fiber } if fiber
+            if !try_again && timeout > 0
+              timer = ::EM::Timer.new(timeout) do
+                timer = nil
+                ::EM.next_tick { fiber.resume if fiber } if fiber
+              end
+              fiber = Fiber.current
+              Fiber.yield 
+              fiber = nil
             end
-            fiber = Fiber.current
-            Fiber.yield 
-            fiber = nil
+            finish_time = Time.now.to_f
+            if try_again || finish_time > expire_time
+              block_timeout-= finish_time - start_time if block_timeout
+              try_again = false
+            else
+              return false
+            end
           end
-          finish_time = Time.now.to_f
-          if try_again || finish_time > expire_time
-            block_timeout-= finish_time - start_time if block_timeout
-            try_again = false
-          else
-            return false
-          end
+          true
+        ensure
+          timer.cancel if timer
+          timer = nil
+          queues.each {|q| q.delete handler }
+          names.each {|n| @@signal_queue.delete(n) if @@signal_queue[n].empty? }
         end
-        true
-      ensure
-        timer.cancel if timer
-        timer = nil
-        queues.each {|q| q.delete handler }
-        names.each {|n| @@signal_queue.delete(n) if @@signal_queue[n].empty? }
       end
 
       # Execute block of code protected with semaphore.
@@ -298,7 +310,7 @@ class Redis
       # If `block_timeout` or Mutex#block_timeout is set and
       # lock isn't obtained within `block_timeout` seconds this method raises
       # MutexTimeout.
-      def synchronize(block_timeout = nil)
+      def synchronize(block_timeout=nil)
         if lock(block_timeout)
           begin
             yield self
@@ -321,7 +333,10 @@ class Redis
         
         # Assigns default value of expiration timeout in seconds.
         # Must be > 0.
-        def default_expire=(value); @@default_expire=value.to_f.abs; end
+        def default_expire=(value)
+          raise ArgumentError, "#{name}.default_expire value must be greater than 0" unless (value = value.to_f) > 0
+          @@default_expire = value
+        end
 
         # Setup redis database and other defaults
         # MUST BE called once before any semaphore is created.
