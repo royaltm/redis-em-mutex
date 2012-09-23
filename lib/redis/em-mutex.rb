@@ -247,7 +247,7 @@ class Redis
           queues = names.map {|n| @@signal_queue[n] << handler }
           ident_match = owner_ident
           until try_lock
-            Mutex.start_watcher unless @@watching == $$
+            Mutex.start_watcher unless watching?
             start_time = Time.now.to_f
             expire_time = nil
             @@redis_pool.execute(false) do |r|
@@ -283,7 +283,7 @@ class Redis
                 ::EM.next_tick { fiber.resume if fiber } if fiber
               end
               fiber = Fiber.current
-              Fiber.yield 
+              Fiber.yield
               fiber = nil
             end
             finish_time = Time.now.to_f
@@ -322,15 +322,21 @@ class Redis
         end
       end
 
+      # Returns true if watcher is connected
+      def watching?; @@watching == $$; end
+
+      # Returns true if watcher is connected
+      def self.watching?; @@watching == $$; end
+
       class << self
         def ns; @@ns; end
         def ns=(namespace); @@ns = namespace; end
         alias_method :namespace, :ns
         alias_method :'namespace=', :'ns='
-        
+
         # Default value of expiration timeout in seconds.
         def default_expire; @@default_expire; end
-        
+
         # Assigns default value of expiration timeout in seconds.
         # Must be > 0.
         def default_expire=(value)
@@ -439,8 +445,8 @@ class Redis
         # Mutex.setup for "lightweight" startup procedure.
         def start_watcher
           raise MutexError, "call #{self.class}::setup first" unless @@redis_watcher
-          return if @@watching == $$
-          if @@watching
+          return if watching?
+          if @@watching # Process id changed, we've been forked alive!
             @@redis_watcher = Redis.new @redis_options
             @@signal_queue.clear
           end
@@ -481,10 +487,10 @@ class Redis
               else
                 sleep retries > 1 ? 1 : 0.1
               end
-            end while @@watching == $$
+            end while watching?
           end.resume
           until @@watcher_subscribed
-            raise MutexError, "Can not establish watcher channel connection!" unless @@watching == $$
+            raise MutexError, "Can not establish watcher channel connection!" unless watching?
             fiber = Fiber.current
             ::EM.next_tick { fiber.resume }
             Fiber.yield
@@ -505,7 +511,7 @@ class Redis
         # Pass `true` to forcefully stop it. This might instead cause
         # MutexError to be raised in waiting fibers.
         def stop_watcher(force = false)
-          return unless @@watching == $$
+          return unless watching?
           raise MutexError, "call #{self.class}::setup first" unless @@redis_watcher
           unless @@signal_queue.empty? || force
             raise MutexError, "can't stop: active signal queue handlers"
