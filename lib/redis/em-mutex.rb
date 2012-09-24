@@ -584,14 +584,16 @@ class Redis
         end
 
         # Attempts to grab the lock and waits if it isn’t available.
-        # Raises MutexError if mutex was locked by the current owner.
+        # Raises MutexError if mutex was locked by the current owner
+        # or if used before Mutex.setup.
+        # Raises ArgumentError on invalid options.
         # Returns instance of Redis::EM::Mutex if lock was successfully obtained.
         # Returns `nil` if lock wasn't available within `:block` seconds.
         #
-        #   Redis::EM::Mutex.lock(*names, opts = {})
+        #   Redis::EM::Mutex.lock(*names, options = {})
         #
         # - *names = lock identifiers - if none they are auto generated
-        # - opts = options hash:
+        # - options = hash:
         # - :name - same as name (in case *names arguments were omitted)
         # - :block - block timeout
         # - :expire - expire timeout (see: Mutex#lock and Mutex#try_lock)
@@ -600,13 +602,14 @@ class Redis
           mutex = new(*args)
           mutex if mutex.lock
         end
+
         # Execute block of code protected with named semaphore.
         # Returns result of code block.
         #
-        #   Redis::EM::Mutex.synchronize(*names, opts = {}, &block)
+        #   Redis::EM::Mutex.synchronize(*names, options = {}, &block)
         # 
         # - *names = lock identifiers - if none they are auto generated
-        # - opts = options hash:
+        # - options = hash:
         # - :name - same as name (in case *names arguments were omitted)
         # - :block - block timeout
         # - :expire - expire timeout (see: Mutex#lock and Mutex#try_lock)
@@ -614,6 +617,8 @@ class Redis
         # 
         # If `:block` is set and lock isn't obtained within `:block` seconds this method raises
         # MutexTimeout.
+        # Raises MutexError if used before Mutex.setup.
+        # Raises ArgumentError on invalid options.
         def synchronize(*args, &block)
           new(*args).synchronize(&block)
         end
