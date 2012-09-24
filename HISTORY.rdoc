@@ -1,8 +1,7 @@
-next release
+0.2.0
 - added compatibility with EM::Synchrony::Thread::ConditionVariable
 - added #sleep and #wakeup
 - moved Redis::EM::Mutex::NS to autoloaded file
-- fixed: #refresh returns nil if mutex wasn't locked by current owner
 - added #unlock! and now mutex object stores ownership information
 - added #expired? and other expiration status methods
 - added watching? helper
