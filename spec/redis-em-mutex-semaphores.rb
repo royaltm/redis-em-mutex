@@ -322,7 +322,7 @@ describe Redis::EM::Mutex do
   it "should lock and provide current expiration timeout correctly" do
     begin
       mutex = described_class.new(@lock_names.first)
-      mutex.unlock!.should be_nil
+      mutex.unlock!.should be false
       mutex.expired?.should be_nil
       mutex.locked?.should be false
       mutex.owned?.should be false
@@ -345,7 +345,7 @@ describe Redis::EM::Mutex do
       mutex.locked?.should be false
       mutex.owned?.should be false
       mutex.unlock.should be_an_instance_of described_class
-      mutex.unlock!.should be_nil
+      mutex.unlock!.should be false
       mutex.expired?.should be_nil
       mutex.expires_in.should be_nil
       mutex.expires_at.should be_nil
@@ -378,8 +378,8 @@ describe Redis::EM::Mutex do
       Fiber.yield
       mutex.refresh.should be false
       mutex.unlock!.should be false
-      mutex.refresh.should be_nil
-      mutex.unlock!.should be_nil
+      mutex.refresh.should be false
+      mutex.unlock!.should be false
       mutex.unlock.should be_an_instance_of described_class
     ensure
       mutex.unlock if mutex

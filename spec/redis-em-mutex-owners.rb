@@ -98,7 +98,7 @@ describe Redis::EM::Mutex do
           }.to raise_error(Redis::EM::Mutex::MutexError, /deadlock; recursive locking/)
           mutex2.lock.should be false
           mutex1.refresh.should be true
-          mutex2.refresh.should be_nil
+          mutex2.refresh.should be false
           mutex2.block_timeout = nil
           ::EM.next_tick { fiber.resume }
           start = Time.now
@@ -113,10 +113,10 @@ describe Redis::EM::Mutex do
       Fiber.yield
       EM::Synchrony.sleep 0.5
       mutex1.refresh.should be true
-      mutex2.refresh.should be_nil
+      mutex2.refresh.should be false
       mutex1.unlock.should be_an_instance_of described_class
       Fiber.yield
-      mutex1.refresh.should be_nil
+      mutex1.refresh.should be false
       mutex2.refresh.should be true
     ensure
       mutex1.unlock if mutex1

@@ -122,7 +122,7 @@ class Redis
 
       # Returns `true` when the semaphore is being held and have already expired.
       # Returns `false` when the semaphore is still locked and valid
-      # or `nil` if the semaphore wasn't locked.
+      # or `nil` if the semaphore wasn't locked by current owner.
       #
       # The check is performed only on the Mutex object instance and should only be used as a hint.
       # For reliable lock status information use #refresh or #owned? instead.
@@ -133,7 +133,7 @@ class Redis
       # Returns the number of seconds left until the semaphore expires.
       # The number of seconds less than 0 means that the semaphore expired and could be grabbed
       # by some other owner.
-      # Returns `nil` if the semaphore wasn't locked.
+      # Returns `nil` if the semaphore wasn't locked by current owner.
       #
       # The check is performed only on the Mutex object instance and should only be used as a hint.
       # For reliable lock status information use #refresh or #owned? instead.
@@ -142,7 +142,7 @@ class Redis
       end
 
       # Returns local time at which the semaphore will expire or have expired.
-      # Returns `nil` if the semaphore wasn't locked.
+      # Returns `nil` if the semaphore wasn't locked by current owner.
       #
       # The check is performed only on the Mutex object instance and should only be used as a hint.
       # For reliable lock status information use #refresh or #owned? instead.
@@ -182,23 +182,24 @@ class Redis
       end
 
       # Refreshes lock expiration timeout.
-      # Returns `true` if refresh was successfull or `nil` if semaphore wasn't locked.
-      # When the semaphore was locked but has expired and has already changed owner returns `false`.
+      # Returns `true` if refresh was successfull.
+      # Returns `false` if the semaphore wasn't locked or when it was locked but it has expired
+      # and now it's got a new owner.
       def refresh(expire_timeout=nil)
-        ret = nil
+        ret = false
         if @locked_id && owner_ident(@locked_id) == (lock_full_ident = @locked_owner_id)
           new_lock_id = (Time.now + (expire_timeout.to_f.nonzero? || self.expire_timeout)).to_f.to_s
           new_lock_full_ident = owner_ident(new_lock_id)
           @@redis_pool.execute(false) do |r|
             r.watch(*@ns_names) do
-              ret = !!if r.mget(*@ns_names).all? {|v| v == lock_full_ident}
+              if r.mget(*@ns_names).all? {|v| v == lock_full_ident}
                 if r.multi {|m| m.mset(*@ns_names.map {|k| [k, new_lock_full_ident]}.flatten)}
                   @locked_id = new_lock_id
                   @locked_owner_id = new_lock_full_ident
+                  ret = true
                 end
               else
                 r.unwatch
-                false
               end
             end
           end
@@ -207,21 +208,20 @@ class Redis
       end
 
       # Releases the lock. Returns self on success.
-      # If the semaphore wasn’t locked returns `nil`.
-      # When the semaphore was locked but has expired and has already changed owner returns `false`.
+      # Returns `false` if the semaphore wasn't locked or when it was locked but it has expired
+      # and now it's got a new owner.
       def unlock!
-        ret = nil
+        ret = false
         if @locked_id && owner_ident(@locked_id) == (lock_full_ident = @locked_owner_id)
           @@redis_pool.execute(false) do |r|
             r.watch(*@ns_names) do
-              ret = if r.mget(*@ns_names).all? {|v| v == lock_full_ident}
-                !!r.multi do |multi|
+              if r.mget(*@ns_names).all? {|v| v == lock_full_ident}
+                ret = !!r.multi do |multi|
                   multi.del(*@ns_names)
                   multi.publish SIGNAL_QUEUE_CHANNEL, Marshal.dump(@ns_names)
                 end
               else
                 r.unwatch
-                false
               end
             end
           end

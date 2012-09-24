@@ -87,7 +87,7 @@ describe Redis::EM::Mutex do
       }.to raise_error(Redis::EM::Mutex::MutexTimeout)
       (Time.now - start).should be_within(0.002).of(0.003)
       mutex.owned?.should be false
-      mutex.unlock!.should be_nil
+      mutex.unlock!.should be false
       mutex.block_timeout = nil
       start = Time.now
       mutex.lock.should be true
