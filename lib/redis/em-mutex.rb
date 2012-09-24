@@ -63,15 +63,18 @@ class Redis
 
       # Creates a new cross machine/process/fiber semaphore
       #
-      #   Redis::EM::Mutex.new(*names, opts = {})
+      #   Redis::EM::Mutex.new(*names, options = {})
       #
       # - *names = lock identifiers - if none they are auto generated
-      # - opts = options hash:
+      # - options = hash:
       # - :name - same as *names (in case *names arguments were omitted)
       # - :block - default block timeout
       # - :expire - default expire timeout (see: Mutex#lock and Mutex#try_lock)
       # - :ns - local namespace (otherwise global namespace is used)
       # - :owner - owner definition instead of Fiber#__id__
+      #
+      # Raises MutexError if used before Mutex.setup.
+      # Raises ArgumentError on invalid options.
       def initialize(*args)
         raise MutexError, "call #{self.class}::setup first" unless @@redis_pool
 
@@ -80,7 +83,7 @@ class Redis
         @names = args
         @names = Array(opts[:name] || "#{@@name_index.succ!}.lock") if @names.empty?
         @slept = {}
-        raise MutexError, "semaphore names must not be empty" if @names.empty?
+        raise ArgumentError, "semaphore names must not be empty" if @names.empty?
         @multi = !@names.one?
         @ns = opts[:ns] || @@ns
         @ns_names = @ns ? @names.map {|n| "#@ns:#{n}".freeze }.freeze : @names.map {|n| n.to_s.dup.freeze }.freeze
@@ -110,6 +113,7 @@ class Redis
       end
 
       # Returns `true` if this semaphore (all the locked `names`) is currently being held by calling owner.
+      # This is the method you should use to check if lock is still held and valid.
       def owned?
         !!if @locked_id && owner_ident(@locked_id) == (lock_full_ident = @locked_owner_id)
           @@redis_pool.mget(*@ns_names).all? {|v| v == lock_full_ident}
@@ -127,7 +131,7 @@ class Redis
       end
 
       # Returns the number of seconds left until the semaphore expires.
-      # The number of seconds less than 0 means that the semaphore expired and can be re-captured
+      # The number of seconds less than 0 means that the semaphore expired and could be grabbed
       # by some other owner.
       # Returns `nil` if the semaphore wasn't locked.
       #
@@ -179,7 +183,7 @@ class Redis
 
       # Refreshes lock expiration timeout.
       # Returns `true` if refresh was successfull or `nil` if semaphore wasn't locked.
-      # When semaphore was locked but has already expired and was re-captured returns `false`.
+      # When the semaphore was locked but has expired and has already changed owner returns `false`.
       def refresh(expire_timeout=nil)
         ret = nil
         if @locked_id && owner_ident(@locked_id) == (lock_full_ident = @locked_owner_id)
@@ -204,7 +208,7 @@ class Redis
 
       # Releases the lock. Returns self on success.
       # If the semaphore wasn’t locked returns `nil`.
-      # When the semaphore was locked but expired and was re-captured returns `false`.
+      # When the semaphore was locked but has expired and has already changed owner returns `false`.
       def unlock!
         ret = nil
         if @locked_id && owner_ident(@locked_id) == (lock_full_ident = @locked_owner_id)
@@ -326,6 +330,7 @@ class Redis
       # Raises MutexError if mutex wasn’t locked by the current owner.
       # Raises MutexTimeout if #block_timeout= was set and timeout
       # occured while locking after sleep.
+      # If code block is provided it is executed after waking up, just before grabbing a lock.
       def sleep(timeout = nil)
         raise MutexError, "can't sleep #{self.class} wasn't locked" unless unlock!
         start = Time.now
