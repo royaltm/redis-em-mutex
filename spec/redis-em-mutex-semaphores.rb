@@ -157,6 +157,9 @@ describe Redis::EM::Mutex do
   end
 
   it "should lock and expire while other fiber lock on the same semaphore with block timeout" do
+    expect {
+      described_class.new(*@lock_names, expire: -1)
+    }.to raise_error(ArgumentError, /expire_timeout value must be greater than 0/)
     mutex = described_class.lock(*@lock_names, expire: 0.2499999)
     mutex.expire_timeout.should eq 0.2499999
     mutex.should be_an_instance_of described_class

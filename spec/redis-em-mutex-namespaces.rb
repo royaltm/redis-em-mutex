@@ -32,11 +32,11 @@ describe Redis::EM::Mutex do
   it "should lock and allow locking on the same semaphore name with different namespace" do
     begin
       mutex = described_class.lock(*@lock_names)
-      mutex.locked?.should be_true
-      mutex.owned?.should be_true
+      mutex.locked?.should be true
+      mutex.owned?.should be true
       ns_mutex = described_class.lock(*@lock_names, ns: :MutexLocalTEST)
-      ns_mutex.locked?.should be_true
-      ns_mutex.owned?.should be_true
+      ns_mutex.locked?.should be true
+      ns_mutex.owned?.should be true
       expect {
         mutex.lock
       }.to raise_error(Redis::EM::Mutex::MutexError, /deadlock; recursive locking/)
@@ -44,11 +44,11 @@ describe Redis::EM::Mutex do
         ns_mutex.lock
       }.to raise_error(Redis::EM::Mutex::MutexError, /deadlock; recursive locking/)
       mutex.unlock
-      mutex.locked?.should be_false
-      mutex.owned?.should be_false
+      mutex.locked?.should be false
+      mutex.owned?.should be false
       ns_mutex.unlock
-      ns_mutex.locked?.should be_false
-      ns_mutex.owned?.should be_false
+      ns_mutex.locked?.should be false
+      ns_mutex.owned?.should be false
     ensure
       mutex.unlock if mutex
       ns_mutex.unlock if ns_mutex
@@ -59,11 +59,11 @@ describe Redis::EM::Mutex do
     begin
       ns = described_class::NS.new(:MutexCustomTEST)
       mutex1 = ns.lock(@lock_names.first)
-      mutex1.locked?.should be_true
-      mutex1.owned?.should be_true
+      mutex1.locked?.should be true
+      mutex1.owned?.should be true
       mutex2 = ns.lock(@lock_names.last)
-      mutex2.locked?.should be_true
-      mutex2.owned?.should be_true
+      mutex2.locked?.should be true
+      mutex2.owned?.should be true
       expect {
         mutex1.lock
       }.to raise_error(Redis::EM::Mutex::MutexError, /deadlock; recursive locking/)
@@ -71,11 +71,11 @@ describe Redis::EM::Mutex do
         mutex2.lock
       }.to raise_error(Redis::EM::Mutex::MutexError, /deadlock; recursive locking/)
       mutex1.unlock
-      mutex1.locked?.should be_false
-      mutex1.owned?.should be_false
+      mutex1.locked?.should be false
+      mutex1.owned?.should be false
       mutex2.unlock
-      mutex2.locked?.should be_false
-      mutex2.owned?.should be_false
+      mutex2.locked?.should be false
+      mutex2.owned?.should be false
     ensure
       mutex1.unlock if mutex1
       mutex2.unlock if mutex2

@@ -11,21 +11,21 @@ describe Redis::EM::Mutex do
       mutex = described_class.lock(*@lock_names, owner: 'my')
       mutex.should be_an_instance_of described_class
       mutex.names.should eq @lock_names
-      mutex.locked?.should be_true
-      mutex.owned?.should be_true
+      mutex.locked?.should be true
+      mutex.owned?.should be true
       expect {
         mutex.lock
       }.to raise_error(Redis::EM::Mutex::MutexError, /deadlock; recursive locking/)
       fiber = Fiber.current
       ::EM::Synchrony.next_tick do
         begin
-          mutex.try_lock.should be_false
-          mutex.locked?.should be_true
-          mutex.owned?.should be_true
+          mutex.try_lock.should be false
+          mutex.locked?.should be true
+          mutex.owned?.should be true
           expect {
             mutex.lock
           }.to raise_error(Redis::EM::Mutex::MutexError, /deadlock; recursive locking/)
-          mutex.refresh.should be_true
+          mutex.refresh.should be true
         rescue Exception => e
           @exception = e
         ensure
@@ -33,16 +33,16 @@ describe Redis::EM::Mutex do
         end
       end
       Fiber.yield
-      mutex.locked?.should be_true
-      mutex.owned?.should be_true
+      mutex.locked?.should be true
+      mutex.owned?.should be true
       mutex.unlock.should be_an_instance_of described_class
       ::EM::Synchrony.next_tick do
         begin
-          mutex.locked?.should be_false
-          mutex.owned?.should be_false
-          mutex.lock.should be_true
-          mutex.locked?.should be_true
-          mutex.owned?.should be_true
+          mutex.locked?.should be false
+          mutex.owned?.should be false
+          mutex.lock.should be true
+          mutex.locked?.should be true
+          mutex.owned?.should be true
           expect {
             mutex.lock
           }.to raise_error(Redis::EM::Mutex::MutexError, /deadlock; recursive locking/)
@@ -53,15 +53,15 @@ describe Redis::EM::Mutex do
         end
       end
       Fiber.yield
-      mutex.locked?.should be_true
-      mutex.owned?.should be_true
+      mutex.locked?.should be true
+      mutex.owned?.should be true
       expect {
         mutex.lock
       }.to raise_error(Redis::EM::Mutex::MutexError, /deadlock; recursive locking/)
       mutex.unlock.should be_an_instance_of described_class
-      mutex.locked?.should be_false
-      mutex.owned?.should be_false
-      mutex.try_lock.should be_true
+      mutex.locked?.should be false
+      mutex.owned?.should be false
+      mutex.try_lock.should be true
     ensure
       mutex.unlock if mutex
     end
@@ -74,35 +74,35 @@ describe Redis::EM::Mutex do
       [mutex1, mutex2].each do |mutex|
         mutex.should be_an_instance_of described_class
         mutex.names.should eq @lock_names
-        mutex.locked?.should be_false
-        mutex.owned?.should be_false
+        mutex.locked?.should be false
+        mutex.owned?.should be false
       end
-      mutex1.lock.should be_true
-      mutex2.lock.should be_false
-      mutex1.locked?.should be_true
-      mutex1.owned?.should be_true
-      mutex2.locked?.should be_true
-      mutex2.owned?.should be_false
+      mutex1.lock.should be true
+      mutex2.lock.should be false
+      mutex1.locked?.should be true
+      mutex1.owned?.should be true
+      mutex2.locked?.should be true
+      mutex2.owned?.should be false
       expect {
         mutex1.lock
       }.to raise_error(Redis::EM::Mutex::MutexError, /deadlock; recursive locking/)
       fiber = Fiber.current
       ::EM::Synchrony.next_tick do
         begin
-          mutex1.locked?.should be_true
-          mutex1.owned?.should be_true
-          mutex2.locked?.should be_true
-          mutex2.owned?.should be_false
+          mutex1.locked?.should be true
+          mutex1.owned?.should be true
+          mutex2.locked?.should be true
+          mutex2.owned?.should be false
           expect {
             mutex1.lock
           }.to raise_error(Redis::EM::Mutex::MutexError, /deadlock; recursive locking/)
-          mutex2.lock.should be_false
-          mutex1.refresh.should be_true
-          mutex2.refresh.should be_false
+          mutex2.lock.should be false
+          mutex1.refresh.should be true
+          mutex2.refresh.should be_nil
           mutex2.block_timeout = nil
           ::EM.next_tick { fiber.resume }
           start = Time.now
-          mutex2.lock.should be_true
+          mutex2.lock.should be true
           (Time.now - start).should be_within(0.01).of(0.5)
         rescue Exception => e
           @exception = e
@@ -112,12 +112,12 @@ describe Redis::EM::Mutex do
       end
       Fiber.yield
       EM::Synchrony.sleep 0.5
-      mutex1.refresh.should be_true
-      mutex2.refresh.should be_false
+      mutex1.refresh.should be true
+      mutex2.refresh.should be_nil
       mutex1.unlock.should be_an_instance_of described_class
       Fiber.yield
-      mutex1.refresh.should be_false
-      mutex2.refresh.should be_true
+      mutex1.refresh.should be_nil
+      mutex2.refresh.should be true
     ensure
       mutex1.unlock if mutex1
       mutex2.unlock if mutex2
