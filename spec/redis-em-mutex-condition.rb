@@ -56,6 +56,45 @@ describe Redis::EM::Mutex do
     end
   end
 
+  it "should lock and sleep and raise MutexTimeout on wakeup" do
+    begin
+      mutex = described_class.lock(*@lock_names, block: 0)
+      mutex.owned?.should be true
+      fiber = Fiber.current
+      ::EM::Synchrony.next_tick do
+        begin
+          mutex.owned?.should be false
+          mutex.lock.should be true
+          mutex.owned?.should be true
+          mutex.wakeup(fiber)
+          ::EM::Synchrony.sleep(0.2)
+          mutex.unlock!.should be_true
+        rescue Exception => e
+          @exception = e
+          mutex.unlock
+        end
+      end
+      start = Time.now
+      expect {
+        mutex.sleep
+      }.to raise_error(Redis::EM::Mutex::MutexTimeout)
+      (Time.now - start).should be_within(0.002).of(0.003)
+      mutex.owned?.should be false
+      mutex.unlock!.should be_nil
+      mutex.block_timeout = nil
+      start = Time.now
+      mutex.lock.should be true
+      (Time.now - start).should be_within(0.01).of(0.2)
+      mutex.owned?.should be true
+      mutex.unlock!.should be_true
+    rescue Exception => e
+      ::EM::Synchrony.sleep(0.3)
+      raise e
+    ensure
+      mutex.unlock
+    end
+  end
+
   it "should work with EM::Synchrony::Thread::ConditionVariable" do
     mutex = described_class.new(*@lock_names)
     resource = ::EM::Synchrony::Thread::ConditionVariable.new
