@@ -24,6 +24,13 @@ describe Redis::EM::Mutex do
     end
   end
 
+  it "should raise MutexError on sleep if unlocked" do
+    mutex = described_class.new(*@lock_names)
+    expect {
+      mutex.sleep
+    }.to raise_error(Redis::EM::Mutex::MutexError, /can't sleep #{described_class} wasn't locked/)
+  end
+
   it "should lock and sleep with timeout" do
     begin
       mutex = described_class.lock(*@lock_names)
