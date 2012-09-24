@@ -22,7 +22,7 @@ class Redis
     #
     class Mutex
 
-      autoload :NS, 'redis/em-mutex/ns.rb'
+      autoload :NS, 'redis/em-mutex/ns'
       autoload :Macro, 'redis/em-mutex/macro'
 
       module Errors
