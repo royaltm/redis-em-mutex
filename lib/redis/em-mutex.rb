@@ -127,7 +127,7 @@ class Redis
       # The check is performed only on the Mutex object instance and should only be used as a hint.
       # For reliable lock status information use #refresh or #owned? instead.
       def expired?
-        return Time.now.to_f > @locked_id.to_f if @locked_id && owner_ident(@locked_id) == @locked_owner_id
+        Time.now.to_f > @locked_id.to_f if @locked_id && owner_ident(@locked_id) == @locked_owner_id
       end
 
       # Returns the number of seconds left until the semaphore expires.
@@ -138,7 +138,7 @@ class Redis
       # The check is performed only on the Mutex object instance and should only be used as a hint.
       # For reliable lock status information use #refresh or #owned? instead.
       def expires_in
-        return @locked_id.to_f - Time.now.to_f if @locked_id && owner_ident(@locked_id) == @locked_owner_id
+        @locked_id.to_f - Time.now.to_f if @locked_id && owner_ident(@locked_id) == @locked_owner_id
       end
 
       # Returns local time at which the semaphore will expire or have expired.
@@ -151,7 +151,7 @@ class Redis
       end
 
       # Returns timestamp at which the semaphore will expire or have expired.
-      # Returns `nil` if the semaphore wasn't locked.
+      # Returns `nil` if the semaphore wasn't locked by current owner.
       #
       # The check is performed only on the Mutex object instance and should only be used as a hint.
       # For reliable lock status information use #refresh or #owned? instead.
