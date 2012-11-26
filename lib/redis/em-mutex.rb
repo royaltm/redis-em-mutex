@@ -209,24 +209,30 @@ class Redis
       # Releases the lock. Returns self on success.
       # Returns `false` if the semaphore wasn't locked or when it was locked but it has expired
       # and now it's got a new owner.
+      # In case of unlocking multiple name semaphore this method returns self only when all
+      # of the names have been unlocked successfully.
       def unlock!
-        ret = false
+        sem_left = @ns_names.length
         if @locked_id && owner_ident(@locked_id) == (lock_full_ident = @locked_owner_id)
           @@redis_pool.execute(false) do |r|
-            r.watch(*@ns_names) do
-              if r.mget(*@ns_names).all? {|v| v == lock_full_ident}
-                ret = !!r.multi do |multi|
-                  multi.del(*@ns_names)
-                  multi.publish SIGNAL_QUEUE_CHANNEL, Marshal.dump(@ns_names)
+            @ns_names.each do |name|
+              r.watch(name) do
+                if r.get(name) == lock_full_ident
+                  if (r.multi {|multi|
+                      multi.del(name)
+                      multi.publish SIGNAL_QUEUE_CHANNEL, Marshal.dump([name])
+                    })
+                    sem_left -= 1
+                  end
+                else
+                  r.unwatch
                 end
-              else
-                r.unwatch
               end
             end
           end
           @locked_owner_id = @locked_id = nil
         end
-        ret && self
+        sem_left.zero? && self
       end
 
       # Releases the lock unconditionally.
