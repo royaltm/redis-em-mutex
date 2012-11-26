@@ -386,6 +386,27 @@ describe Redis::EM::Mutex do
     end
   end
 
+  it "should unlock multiple names independently" do
+    begin
+      mutex = described_class.lock(*@lock_names[0,2], expire: 0.01)
+      mutex.should be_an_instance_of described_class
+      EM::Synchrony.sleep 0.02
+      fiber = Fiber.current
+      EM::Synchrony.next_tick {
+        mutex2 = described_class.lock(*@lock_names[1,2])
+        mutex2.should be_an_instance_of described_class
+        mutex2.unlock!.should be mutex2
+        fiber.resume
+      }
+      Fiber.yield
+      mutex.unlock!.should be false
+      mutex.lock.should be true
+      mutex.should be_an_instance_of described_class
+    ensure
+      mutex.unlock if mutex
+    end
+  end
+
   around(:each) do |testcase|
     @after_em_stop = nil
     @exception = nil
