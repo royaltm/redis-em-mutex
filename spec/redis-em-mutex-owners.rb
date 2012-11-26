@@ -103,7 +103,7 @@ describe Redis::EM::Mutex do
           ::EM.next_tick { fiber.resume }
           start = Time.now
           mutex2.lock.should be true
-          (Time.now - start).should be_within(0.01).of(0.5)
+          (Time.now - start).should be_within(0.02).of(0.5)
         rescue Exception => e
           @exception = e
         ensure

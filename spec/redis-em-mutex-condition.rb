@@ -54,8 +54,8 @@ describe Redis::EM::Mutex do
       ::EM.add_timer(0.15) do
         mutex.wakeup(fiber)
       end
-      mutex.sleep(0.25).should be_within(0.001).of(0.15)
-      (Time.now - start).should be_within(0.001).of(0.15)
+      mutex.sleep(0.25).should be_within(0.005).of(0.15)
+      (Time.now - start).should be_within(0.005).of(0.15)
       mutex.owned?.should be true
       mutex.unlock!.should be_true
     ensure
@@ -122,7 +122,7 @@ describe Redis::EM::Mutex do
     end
     start = Time.now
     now = Fiber.yield
-    (now - signal).should be_within(0.001).of(0.001)
+    (now - signal).should be_within(0.002).of(0.001)
     (now - start).should be_within(0.01).of(0.2)
     mutex.synchronize do
       signal = nil
