@@ -553,7 +553,7 @@ class Redis
         # EM sleep helper
         def sleep(seconds)
           fiber = Fiber.current
-          ::EM::Timer.new(secs) { fiber.resume }
+          ::EM::Timer.new(seconds) { fiber.resume }
           Fiber.yield
         end
 

@@ -80,6 +80,12 @@ describe Redis::EM::Mutex do
     redis.client.scheme.should eq 'redis'  
   end
 
+  it "should be able to sleep" do
+    t = Time.now
+    described_class.sleep 0.11
+    (Time.now - t).should be_within(0.02).of(0.11)
+  end
+
   around(:each) do |testcase|
     @after_em_stop = nil
     ::EM.synchrony do
