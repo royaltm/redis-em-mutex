@@ -53,7 +53,7 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
 == USAGE
 
   require 'em-synchrony'
-  require 'em-redis-mutex'
+  require 'redis-em-mutex'
 
   Redis::EM::Mutex.setup(size: 10, url: 'redis:///1', expire: 600)
 
