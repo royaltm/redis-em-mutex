@@ -44,7 +44,11 @@ class Redis
       @@watcher_subscribed = false
       @@signal_queue = Hash.new {|h,k| h[k] = []}
       @@ns = nil
-      @@uuid = nil
+      @@uuid ||= if SecureRandom.respond_to?(:uuid)
+        SecureRandom.uuid
+      else
+        SecureRandom.base64(24)
+      end
 
       attr_reader :names, :ns, :block_timeout
       alias_method :namespace, :ns
@@ -459,11 +463,6 @@ class Redis
           self.default_expire = opts.expire if opts.expire
           @@connection_retry_max = opts.reconnect_max.to_i if opts.reconnect_max
           @@ns = namespace if namespace
-          @@uuid = if SecureRandom.respond_to?(:uuid)
-            SecureRandom.uuid
-          else
-            SecureRandom.base64(24)
-          end
           unless (@@redis_pool = redis)
             unless @@connection_pool_class
               begin
@@ -558,10 +557,10 @@ class Redis
         end
 
         # Stops the watcher of the "unlock" channel.
-        # It should be called before stoping EvenMachine otherwise
+        # It should be called before stopping EvenMachine otherwise
         # EM might wait forever for channel connection to be closed.
         #
-        # Raises MutexError if there are still some fibers waiting for a lock.
+        # Raises MutexError if there are still some fibers waiting for lock.
         # Pass `true` to forcefully stop it. This might instead cause
         # MutexError to be raised in waiting fibers.
         def stop_watcher(force = false)
