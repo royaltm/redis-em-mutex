@@ -52,6 +52,7 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
 
 == USAGE
 
+```ruby
   require 'em-synchrony'
   require 'redis-em-mutex'
 
@@ -92,9 +93,11 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
     Redis::EM::Mutex.stop_watcher
     EM.stop
   end
+```
 
 === Namespaces
 
+```ruby
   Redis::EM::Mutex.setup(ns: 'my_namespace', ....)
 
   # or multiple namespaces:
@@ -108,9 +111,11 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
     ...
     EM.stop
   end
+```
 
 === Multi-locks
 
+```ruby
   EM.synchrony do
     Redis::EM::Mutex.synchronize('foo', 'bar', 'baz') do
       .... do something with foo, bar and baz
@@ -118,9 +123,11 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
     ...
     EM.stop
   end
+```
 
 === Locking options
 
+```ruby
   EM.synchrony do
     begin
       Redis::EM::Mutex.synchronize('foo', 'bar', block: 0.25) do
@@ -142,6 +149,7 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
     ...
     EM.stop
   end
+```
 
 === Macro-style definition
 
@@ -149,6 +157,7 @@ Borrowed from http://github.com/kenn/redis-mutex.
 Redis::EM::Mutex::Macro is a mixin which protects selected instance methods of a class with a mutex.
 The locking scope will be Mutex global namespace + class name + method name.
 
+```ruby
   class TheClass
     include Redis::EM::Mutex::Macro
   
@@ -190,12 +199,14 @@ The locking scope will be Mutex global namespace + class name + method name.
     auto_mutex :foo, block: 0, on_timeout: proc { puts 'bar!' }
 
   end
+```
 
 === ConditionVariable
 
 Redis::EM::Mutex may be used with EventMachine::Synchrony::Thread::ConditionVariable
 in place of EventMachine::Synchrony::Thread::Mutex.
 
+```ruby
   mutex = Redis::EM::Mutex.new('resource')
   resource = EM::Synchrony::Thread::ConditionVariable.new
   EM::Synchrony.next_tick do
@@ -211,6 +222,7 @@ in place of EventMachine::Synchrony::Thread::Mutex.
       resource.signal
     }
   end
+```
 
 === Advanced
 
@@ -234,6 +246,7 @@ This way we make sure that any other connection from the same ip address made to
 will have different ownership defined. At the same time all the fibers working with that Connection instance
 can access mutex's #refresh and #unlock methods concurrently.
 
+```ruby
   module MutexedConnection
     def post_init
       @buffer = ""
@@ -274,6 +287,7 @@ can access mutex's #refresh and #unlock methods concurrently.
     Redis::EM::Mutex.setup(size: 10, url: 'redis:///1', expire: 600)
     EM.start_server "0.0.0.0", 6969, MutexedConnection
   }
+```
 
 ==== Forking live
 
@@ -281,6 +295,7 @@ You may safely fork process while running event reactor and having locked semaph
 The locked semaphores in newly forked process will become unlocked while
 their locked status in parent process will be preserved.
 
+```ruby
   mutex = Redis::EM::Mutex.new('resource1', 'resource2', expire: 60)
 
   EM.synchrony do
@@ -312,12 +327,14 @@ their locked status in parent process will be preserved.
     Redis::EM::Mutex.stop_watcher
     EM.stop
   end
+```
 
 ==== Redis factory
 
 Want to use some non-standard redis options or customized client for semaphore watcher and/or redis pool?
 Use :redis_factory option then.
 
+```ruby
   require 'redis-sentinel'
 
   Redis::EM::Mutex.setup do |opts|
@@ -330,6 +347,7 @@ Use :redis_factory option then.
         sentinels: [{host: "redis1", port: 6379}, {host: "redis2", port: 6380}])
     end
   end
+```
 
 == LICENCE
 
