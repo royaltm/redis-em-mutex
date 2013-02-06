@@ -32,16 +32,13 @@ class Redis
       include Errors
       extend Errors
 
-      @@connection_pool_class = nil
-      @@connection_retry_max = 10
-      @@default_expire = 3600*24
-      AUTO_NAME_SEED = '__@'
       SIGNAL_QUEUE_CHANNEL = "::#{self.name}::"
+      AUTO_NAME_SEED = '__@'
+      DEFAULT_RECONNECT_MAX_RETRIES = 10
+      @@default_expire = 3600*24
       @@name_index = AUTO_NAME_SEED
       @@redis_pool = nil
-      @@redis_watcher = nil
       @@watching = false
-      @@watcher_subscribed = false
       @@signal_queue = Hash.new {|h,k| h[k] = []}
       @@ns = nil
       @@uuid ||= if SecureRandom.respond_to?(:uuid)
@@ -386,6 +383,13 @@ class Redis
       def self.watching?; @@watching == $$; end
 
       class << self
+        attr_reader :reconnect_max_retries
+        def reconnect_forever?
+          @reconnect_max_retries < 0
+        end
+        def reconnect_max_retries=(max)
+          @reconnect_max_retries = max == :forever ? -1 : max.to_i
+        end
         def ns; @@ns; end
         def ns=(namespace); @@ns = namespace; end
         alias_method :namespace, :ns
@@ -409,18 +413,19 @@ class Redis
         # global options:
         #
         # - :connection_pool_class - default is ::EM::Synchrony::ConnectionPool
+        # - :redis_factory - default is proc {|opts| Redis.new opts }
         # - :expire   - sets global Mutex.default_expire 
         # - :ns       - sets global Mutex.namespace
         # - :reconnect_max - maximum num. of attempts to re-establish
         #   connection to redis server;
         #   default is 10; set to 0 to disable re-connecting;
-        #   set to -1 to attempt forever
+        #   set to -1 or :forever to attempt forever
         #
         # redis connection options:
         #
         # - :size     - redis connection pool size
         #
-        # passed directly to Redis.new:
+        # passed directly to redis_factory:
         #
         # - :url      - redis server url
         #
@@ -438,10 +443,10 @@ class Redis
         # - :redis    - initialized ConnectionPool of Redis clients.
         def setup(opts = {})
           stop_watcher
+          @watcher_subscribed = nil
           opts = OpenStruct.new(opts)
           yield opts if block_given?
-          @@connection_pool_class = opts.connection_pool_class if opts.connection_pool_class.kind_of?(Class)
-          @redis_options = redis_options = {:driver => :synchrony}
+          redis_options = {:driver => :synchrony}
           redis_updater = proc do |redis|
             redis_options.update({
               :scheme => redis.scheme,
@@ -458,25 +463,30 @@ class Redis
             redis_options[:url] = opts.url
           end
           redis_updater.call opts
-          namespace = opts.ns
           pool_size = (opts.size.to_i.nonzero? || 1).abs
           self.default_expire = opts.expire if opts.expire
-          @@connection_retry_max = opts.reconnect_max.to_i if opts.reconnect_max
-          @@ns = namespace if namespace
+          self.reconnect_max_retries = opts.reconnect_max if opts.reconnect_max
+          @connection_pool_class = opts.connection_pool_class if opts.connection_pool_class.kind_of?(Class)
+          @redis_options = redis_options
+          @reconnect_max_retries ||= DEFAULT_RECONNECT_MAX_RETRIES
+          @redis_factory = opts.redis_factory if opts.redis_factory
+          @redis_factory ||= proc {|opts| Redis.new opts }
+          raise TypeError, "redis_factory should respond to [] method" unless @redis_factory.respond_to?(:[])
+          @@ns = opts.ns if opts.ns
           unless (@@redis_pool = redis)
-            unless @@connection_pool_class
+            unless @connection_pool_class
               begin
                 require 'em-synchrony/connection_pool' unless defined?(::EM::Synchrony::ConnectionPool)
               rescue LoadError
                 raise ":connection_pool_class required; could not fall back to EM::Synchrony::ConnectionPool - gem install em-synchrony"
               end
-              @@connection_pool_class = ::EM::Synchrony::ConnectionPool
+              @connection_pool_class = ::EM::Synchrony::ConnectionPool
             end
-            @@redis_pool = @@connection_pool_class.new(size: pool_size) do
-              Redis.new redis_options
+            @@redis_pool = @connection_pool_class.new(size: pool_size) do
+              @redis_factory[redis_options]
             end
           end
-          @@redis_watcher = Redis.new redis_options
+          @redis_watcher = @redis_factory[redis_options]
           start_watcher if ::EM.reactor_running?
         end
 
@@ -500,20 +510,20 @@ class Redis
         # If EventMachine is to be re-started (or after EM.fork_reactor) this method may be used instead of
         # Mutex.setup for "lightweight" startup procedure.
         def start_watcher
-          raise MutexError, "call #{self.class}::setup first" unless @@redis_watcher
+          raise MutexError, "call #{self.class}::setup first" unless @redis_watcher
           return if watching?
           if @@watching # Process id changed, we've been forked alive!
-            @@redis_watcher = Redis.new @redis_options
+            @redis_watcher = @redis_factory[@redis_options]
             @@signal_queue.clear
           end
           @@watching = $$
           retries = 0
           Fiber.new do
             begin
-              @@redis_watcher.subscribe(SIGNAL_QUEUE_CHANNEL) do |on|
+              @redis_watcher.subscribe(SIGNAL_QUEUE_CHANNEL) do |on|
                 on.subscribe do |channel,|
                   if channel == SIGNAL_QUEUE_CHANNEL
-                    @@watcher_subscribed = true
+                    @watcher_subscribed = true
                     retries = 0
                     wakeup_queue_all
                   end
@@ -530,22 +540,22 @@ class Redis
                   end
                 end
                 on.unsubscribe do |channel,|
-                  @@watcher_subscribed = false if channel == SIGNAL_QUEUE_CHANNEL
+                  @watcher_subscribed = false if channel == SIGNAL_QUEUE_CHANNEL
                 end
               end
               break
             rescue Redis::BaseConnectionError, EventMachine::ConnectionError => e
-              @@watcher_subscribed = false
+              @watcher_subscribed = false
               warn e.message
               retries+= 1
-              if retries > @@connection_retry_max && @@connection_retry_max >= 0
+              if retries > reconnect_max_retries && reconnect_max_retries >= 0
                 @@watching = false
               else
                 sleep retries > 1 ? 1 : 0.1
               end
             end while watching?
           end.resume
-          until @@watcher_subscribed
+          until @watcher_subscribed
             raise MutexError, "Can not establish watcher channel connection!" unless watching?
             fiber = Fiber.current
             ::EM.next_tick { fiber.resume }
@@ -569,14 +579,14 @@ class Redis
         # MutexError to be raised in waiting fibers.
         def stop_watcher(force = false)
           return unless watching?
-          raise MutexError, "call #{self.class}::setup first" unless @@redis_watcher
+          raise MutexError, "call #{self.class}::setup first" unless @redis_watcher
           unless @@signal_queue.empty? || force
             raise MutexError, "can't stop: active signal queue handlers"
           end
           @@watching = false
-          if @@watcher_subscribed
-            @@redis_watcher.unsubscribe SIGNAL_QUEUE_CHANNEL
-            while @@watcher_subscribed
+          if @watcher_subscribed
+            @redis_watcher.unsubscribe SIGNAL_QUEUE_CHANNEL
+            while @watcher_subscribed
               fiber = Fiber.current
               ::EM.next_tick { fiber.resume }
               Fiber.yield

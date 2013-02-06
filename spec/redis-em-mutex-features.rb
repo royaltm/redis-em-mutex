@@ -3,6 +3,8 @@ require 'em-synchrony'
 require 'em-synchrony/connection_pool'
 require 'redis-em-mutex'
 
+class TestDummyConnectionPool < EM::Synchrony::ConnectionPool; end
+
 describe Redis::EM::Mutex do
 
   it "should raise MutexError while redis server not found on setup" do
@@ -22,7 +24,7 @@ describe Redis::EM::Mutex do
   it "should setup with redis connection pool" do
     described_class.setup(redis: @redis_pool)
     described_class.class_variable_get(:'@@redis_pool').should be @redis_pool
-    redis = described_class.class_variable_get(:'@@redis_watcher')
+    redis = described_class.instance_variable_get(:'@redis_watcher')
     described_class.stop_watcher
     redis.should be_an_instance_of Redis
     redis.client.host.should eq 'localhost'
@@ -32,15 +34,18 @@ describe Redis::EM::Mutex do
 
   it "should setup with various options" do
     described_class.setup do |cfg|
-      cfg.expire = 42 #   - sets global Mutex.default_expire 
-      cfg.ns = 'redis rulez!' #       - sets global Mutex.namespace
-      cfg.reconnect_max = -1 # - maximum num. of attempts to re-establish
+      cfg.expire = 42                # - sets global Mutex.default_expire
+      cfg.ns = 'redis rulez!'        # - sets global Mutex.namespace
+      cfg.reconnect_max = :forever   # - maximum num. of attempts to re-establish
       cfg.url = 'redis://127.0.0.1/2'
       cfg.size = 10
     end
     described_class.namespace.should eq 'redis rulez!'
     described_class.default_expire.should eq 42
-    described_class.class_variable_get(:'@@connection_retry_max').should eq -1
+    described_class.reconnect_forever?.should be true
+    described_class.instance_variable_get(:'@reconnect_max_retries').should eq -1
+    described_class.reconnect_max_retries = 0
+    described_class.reconnect_forever?.should be false
     redis_pool = described_class.class_variable_get(:'@@redis_pool')
     redis_pool.should be_an_instance_of EM::Synchrony::ConnectionPool
     redis_pool.should_not be @redis_pool
@@ -48,7 +53,7 @@ describe Redis::EM::Mutex do
     redis_pool.client.db.should eq 2
     redis_pool.client.port.should eq 6379
     redis_pool.client.scheme.should eq 'redis'
-    redis = described_class.class_variable_get(:'@@redis_watcher')
+    redis = described_class.instance_variable_get(:'@redis_watcher')
     described_class.stop_watcher
     redis.should be_an_instance_of Redis
     redis.client.host.should eq '127.0.0.1'
@@ -63,15 +68,16 @@ describe Redis::EM::Mutex do
       cfg.host = 'localhost'
       cfg.port = 6379
       cfg.db = 3
+      cfg.connection_pool_class = TestDummyConnectionPool
     end
     redis_pool = described_class.class_variable_get(:'@@redis_pool')
-    redis_pool.should be_an_instance_of EM::Synchrony::ConnectionPool
+    redis_pool.should be_an_instance_of TestDummyConnectionPool
     redis_pool.should_not be @redis_pool
     redis_pool.client.host.should eq 'localhost'
     redis_pool.client.db.should eq 3
     redis_pool.client.port.should eq 6379
     redis_pool.client.scheme.should eq 'redis'
-    redis = described_class.class_variable_get(:'@@redis_watcher')
+    redis = described_class.instance_variable_get(:'@redis_watcher')
     redis.should be_an_instance_of Redis
     described_class.stop_watcher
     redis.client.host.should eq 'localhost'
@@ -80,17 +86,50 @@ describe Redis::EM::Mutex do
     redis.client.scheme.should eq 'redis'  
   end
 
+  it "should be able to setup with redis factory" do
+    counter = 0
+    described_class.setup do |cfg|
+      cfg.redis = @redis_pool
+      cfg.redis_factory = proc do |opts|
+        counter += 1
+        Redis.new opts
+      end
+    end
+    counter.should eq 1
+    counter = 0
+    described_class.setup do |cfg|
+      cfg.size = 5
+      cfg.redis_factory = proc do |opts|
+        counter += 1
+        Redis.new opts
+      end
+    end
+    counter.should eq 6
+  end
+
+
   it "should be able to sleep" do
     t = Time.now
     described_class.sleep 0.11
     (Time.now - t).should be_within(0.02).of(0.11)
   end
 
+  it "should not change uuid" do
+    @uuid.should be_an_instance_of String
+    described_class.class_variable_get(:@@uuid).should eq @uuid
+  end
+
   around(:each) do |testcase|
     @after_em_stop = nil
+    @exception = nil
     ::EM.synchrony do
       begin
         testcase.call
+        raise @exception if @exception
+        described_class.stop_watcher
+      rescue => e
+        described_class.stop_watcher(true)
+        raise e
       ensure
         ::EM.stop
       end
@@ -100,5 +139,6 @@ describe Redis::EM::Mutex do
 
   before(:all) do
     @redis_pool = EM::Synchrony::ConnectionPool.new(size: 10) { Redis.new url: 'redis://localhost/1' }
+    @uuid = described_class.class_variable_get(:@@uuid)
   end
 end
