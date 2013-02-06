@@ -15,9 +15,9 @@ Gem::Specification.new do |s|
   s.files = `git ls-files`.split("\n") - ['.gitignore']
   s.test_files = Dir.glob("spec/**/*")
   s.rdoc_options << "--title" << "redis-em-mutex" <<
-    "--main" << "README.md"
+    "--main" << "DOCINDEX.rdoc"
   s.has_rdoc = true
-  s.extra_rdoc_files = ["README.md"]
+  s.extra_rdoc_files = ["DOCINDEX.rdoc"]
   s.requirements << "Redis server 2.4+"
   s.add_runtime_dependency "redis", ">= 3.0.1"
   s.add_runtime_dependency "hiredis", "~> 0.4.5"

@@ -33,5 +33,5 @@ end
 
 desc "Documentation"
 task :doc do
-  sh "rdoc --encoding=UTF-8 --title=#$gem_name --main=README.rdoc README.rdoc lib/*.rb lib/*/*.rb"
+  sh "yardoc"
 end
