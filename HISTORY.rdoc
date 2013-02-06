@@ -3,6 +3,7 @@ next release
 - fixed: forking process or setup before reactor is running would hang
   current fiber forever on first failed lock
 - added: new setup option :redis_factory
+- fixed: doc format errors
 
 0.2.1
 - fixed: sleep
