@@ -1,14 +1,17 @@
-= redis-em-mutex
+redis-em-mutex
+==============
 
 Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
 
 * http://github.com/royaltm/redis-em-mutex
 
-== DESCRIPTION
+DESCRIPTION
+-----------
 
 *redis-em-mutex* is the cross server-process-fiber EventMachine + Redis based semaphore.
 
-== FEATURES
+FEATURES
+--------
 
 * only for EventMachine
 * no CPU-intensive sleep/polling while waiting for lock to become available
@@ -24,33 +27,37 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
 * compatible with Synchrony::Thread::ConditionVariable
 * extendable (beyond fibers) mutex ownership
 
-== BUGS/LIMITATIONS
+BUGS/LIMITATIONS
+----------------
 
 * only for EventMachine
 * NOT thread-safe
 * locking order between concurrent processes is undetermined (no FIFO)
 * it's not nifty, rather somewhat complicated
 
-== REQUIREMENTS
+REQUIREMENTS
+------------
 
 * ruby >= 1.9 (tested: 1.9.3-p194, 1.9.2-p320, 1.9.1-p378)
 * http://github.com/redis/redis-rb ~> 3.0.1
 * http://rubyeventmachine.com ~> 1.0.0
 * (optional) http://github.com/igrigorik/em-synchrony
 
-== INSTALL
+INSTALL
+-------
 
   $ [sudo] gem install redis-em-mutex
 
-==== Gemfile
+#### Gemfile
 
   gem "redis-em-mutex", "~> 0.2.1"
 
-==== Github
+#### Github
 
   git clone git://github.com/royaltm/redis-em-mutex.git
 
-== USAGE
+USAGE
+-----
 
 ```ruby
   require 'em-synchrony'
@@ -95,7 +102,7 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
   end
 ```
 
-=== Namespaces
+### Namespaces
 
 ```ruby
   Redis::EM::Mutex.setup(ns: 'my_namespace', ....)
@@ -113,7 +120,7 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
   end
 ```
 
-=== Multi-locks
+### Multi-locks
 
 ```ruby
   EM.synchrony do
@@ -125,7 +132,7 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
   end
 ```
 
-=== Locking options
+### Locking options
 
 ```ruby
   EM.synchrony do
@@ -151,7 +158,7 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
   end
 ```
 
-=== Macro-style definition
+### Macro-style definition
 
 Borrowed from http://github.com/kenn/redis-mutex.
 Redis::EM::Mutex::Macro is a mixin which protects selected instance methods of a class with a mutex.
@@ -201,7 +208,7 @@ The locking scope will be Mutex global namespace + class name + method name.
   end
 ```
 
-=== ConditionVariable
+### ConditionVariable
 
 Redis::EM::Mutex may be used with EventMachine::Synchrony::Thread::ConditionVariable
 in place of EventMachine::Synchrony::Thread::Mutex.
@@ -224,9 +231,9 @@ in place of EventMachine::Synchrony::Thread::Mutex.
   end
 ```
 
-=== Advanced
+### Advanced
 
-==== Customized owner
+#### Customized owner
 
 In some cases you might want to extend the ownership of a locked semaphore beyond the current fiber.
 That is to be able to "share" a locked semaphore between group of fibers associated with some external resource.
@@ -289,7 +296,7 @@ can access mutex's #refresh and #unlock methods concurrently.
   }
 ```
 
-==== Forking live
+#### Forking live
 
 You may safely fork process while running event reactor and having locked semaphores.
 The locked semaphores in newly forked process will become unlocked while
@@ -329,7 +336,7 @@ their locked status in parent process will be preserved.
   end
 ```
 
-==== Redis factory
+#### Redis factory
 
 Want to use some non-standard redis options or customized client for semaphore watcher and/or redis pool?
 Use :redis_factory option then.
@@ -349,6 +356,7 @@ Use :redis_factory option then.
   end
 ```
 
-== LICENCE
+LICENCE
+-------
 
 The MIT License - Copyright (c) 2012 Rafał Michalski
