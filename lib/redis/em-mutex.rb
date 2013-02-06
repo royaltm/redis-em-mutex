@@ -480,6 +480,10 @@ class Redis
           start_watcher if ::EM.reactor_running?
         end
 
+        def ready?
+          !!@@redis_pool
+        end
+
         # resets Mutex's automatic name generator
         def reset_autoname
           @@name_index = AUTO_NAME_SEED

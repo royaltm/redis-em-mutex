@@ -6,6 +6,10 @@ require 'redis-em-mutex'
 
 describe Redis::EM::Mutex do
 
+  it "should be ready" do
+    described_class.ready?.should be true
+  end
+
   it "should lock and prevent locking on the same semaphore" do
     described_class.new(@lock_names.first).owned?.should be false
     mutex = described_class.lock(@lock_names.first)
@@ -83,6 +87,7 @@ describe Redis::EM::Mutex do
     mutex.should be_an_instance_of described_class
     mutex.owned?.should be true
     locked = true
+    start = nil
     ::EM::Synchrony.next_tick do
       begin
         locked.should be true
@@ -96,7 +101,6 @@ describe Redis::EM::Mutex do
         end
         mutex.owned?.should be false
         ::EM::Synchrony.sleep 0.1
-        start = Time.now
         ::EM::Synchrony::FiberIterator.new(@lock_names, @lock_names.length).each do |name|
           begin
             locked.should be true
@@ -122,6 +126,7 @@ describe Redis::EM::Mutex do
 
     locked = true
     mutex.lock.should be true
+    start = Time.now
     ::EM::Synchrony.sleep 0.25
     locked = 10
     mutex.unlock.should be_an_instance_of described_class
