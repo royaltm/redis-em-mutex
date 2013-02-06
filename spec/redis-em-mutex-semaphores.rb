@@ -283,19 +283,24 @@ describe Redis::EM::Mutex do
   end
 
   it "should lock and the other process should acquire lock as soon as possible" do
+    described_class.watching?.should be false
     mutex = described_class.lock(*@lock_names)
+    described_class.watching?.should be true
     mutex.should be_an_instance_of described_class
     time_key1 = SecureRandom.random_bytes
     time_key2 = SecureRandom.random_bytes
     ::EM.fork_reactor do
+      described_class.watching?.should be false
       Fiber.new do
         begin
           redis = Redis.new @redis_options
           redis.set time_key1, Time.now.to_f.to_s
           mutex.synchronize do
+            described_class.watching?.should be true
             redis.set time_key2, Time.now.to_f.to_s
           end
           described_class.stop_watcher(false)
+          described_class.watching?.should be false
         # rescue => e
         #   warn e.inspect
         ensure
@@ -303,7 +308,9 @@ describe Redis::EM::Mutex do
         end
       end.resume
     end
+    described_class.watching?.should be true
     EM::Synchrony.sleep 0.25
+    described_class.watching?.should be true
     mutex.owned?.should be true
     mutex.unlock.should be_an_instance_of described_class
     time = Time.now.to_f
@@ -314,7 +321,6 @@ describe Redis::EM::Mutex do
     t1.should be_an_instance_of String
     t1.to_f.should be < time - 0.25
     t2.should be_an_instance_of String
-    t2.to_f.should be > time
     t2.to_f.should be_within(0.001).of(time)
     redis.del(time_key1, time_key2)
   end

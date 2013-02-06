@@ -268,10 +268,10 @@ class Redis
           ::EM.next_tick { fiber.resume if fiber } if fiber
         end
         begin
+          Mutex.start_watcher unless watching?
           queues = names.map {|n| @@signal_queue[n] << handler }
           ident_match = owner_ident
           until try_lock
-            Mutex.start_watcher unless watching?
             start_time = Time.now.to_f
             expire_time = nil
             @@redis_pool.execute(false) do |r|

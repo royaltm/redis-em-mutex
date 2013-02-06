@@ -106,14 +106,19 @@ describe Redis::EM::Mutex do
     mutex = described_class.new(*@lock_names)
     resource = ::EM::Synchrony::Thread::ConditionVariable.new
     signal = nil
+    delta = nil
     fiber = Fiber.current
     ::EM::Synchrony.next_tick do
       mutex.synchronize {
+        signal = true
         resource.wait(mutex)
         fiber.resume Time.now
       }
     end
     ::EM::Synchrony.next_tick do
+      t1 = Time.now
+      ::EM::Synchrony.sleep(0.01) while signal.nil?
+      delta = Time.now - t1
       mutex.synchronize {
         ::EM::Synchrony.sleep(0.2)
         resource.signal
@@ -123,7 +128,7 @@ describe Redis::EM::Mutex do
     start = Time.now
     now = Fiber.yield
     (now - signal).should be_within(0.002).of(0.001)
-    (now - start).should be_within(0.01).of(0.2)
+    (now - start).should be_within(0.01).of(0.2 + delta)
     mutex.synchronize do
       signal = nil
     end
