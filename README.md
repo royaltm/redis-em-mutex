@@ -38,7 +38,7 @@ BUGS/LIMITATIONS
 REQUIREMENTS
 ------------
 
-* ruby >= 1.9 (tested: 1.9.3-p194, 1.9.2-p320, 1.9.1-p378)
+* ruby >= 1.9 (tested: ruby 1.9.3p374, 1.9.3-p194, 1.9.2-p320, 1.9.1-p378)
 * http://github.com/redis/redis-rb ~> 3.0.1
 * http://rubyeventmachine.com ~> 1.0.0
 * (optional) http://github.com/igrigorik/em-synchrony
@@ -53,7 +53,7 @@ $ [sudo] gem install redis-em-mutex
 #### Gemfile
 
 ```ruby
-gem "redis-em-mutex", "~> 0.2.1"
+gem "redis-em-mutex", "~> 0.2.2"
 ```
 
 #### Github

@@ -1,4 +1,4 @@
-next release
+0.2.2
 - fixed: uuid must be set only once
 - fixed: forking process or setup before reactor is running would hang
   current fiber forever on first failed lock
