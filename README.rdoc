@@ -313,6 +313,24 @@ their locked status in parent process will be preserved.
     EM.stop
   end
 
+==== Redis factory
+
+Want to use some non-standard redis options or customized client for semaphore watcher and/or redis pool?
+Use :redis_factory option then.
+
+  require 'redis-sentinel'
+
+  Redis::EM::Mutex.setup do |opts|
+    opts.size = 10
+    opts.password = 'password'
+    opts.db = 11
+    opts.redis_factory = proc do |options|
+      Redis.new options.merge(
+        master_name: "my_master",
+        sentinels: [{host: "redis1", port: 6379}, {host: "redis2", port: 6380}])
+    end
+  end
+
 == LICENCE
 
 The MIT License - Copyright (c) 2012 Rafał Michalski
