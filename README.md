@@ -1,7 +1,7 @@
 redis-em-mutex
 ==============
 
-Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
+Author: Rafał Michalski  (mailto:rafal@yeondir.com)
 
 * http://github.com/royaltm/redis-em-mutex
 
@@ -47,71 +47,70 @@ INSTALL
 -------
 
 ```
-  $ [sudo] gem install redis-em-mutex
+$ [sudo] gem install redis-em-mutex
 ```
 
 #### Gemfile
 
 ```ruby
-  gem "redis-em-mutex", "~> 0.2.1"
+gem "redis-em-mutex", "~> 0.2.1"
 ```
 
 #### Github
 
 ```
-  git clone git://github.com/royaltm/redis-em-mutex.git
+git clone git://github.com/royaltm/redis-em-mutex.git
 ```
 
 USAGE
 -----
 
 ```ruby
-  require 'em-synchrony'
-  require 'redis-em-mutex'
+    require 'em-synchrony'
+    require 'redis-em-mutex'
 
-  Redis::EM::Mutex.setup(size: 10, url: 'redis:///1', expire: 600)
-
-  # or
-
-  Redis::EM::Mutex.setup do |opts|
-    opts.size = 10
-    opts.url = 'redis:///1'
-    ...
-  end
-
-
-  EM.synchrony do
-    Redis::EM::Mutex.synchronize('resource.lock') do
-      ... do something with resource
-    end
-
-    # or 
-
-    mutex = Redis::EM::Mutex.new('resource.lock')
-    mutex.synchronize do
-      ... do something with resource
-    end
+    Redis::EM::Mutex.setup(size: 10, url: 'redis:///1', expire: 600)
 
     # or
 
-    begin
-      mutex.lock
-      ... do something with resource
-    ensure
-      mutex.unlock
+    Redis::EM::Mutex.setup do |opts|
+      opts.size = 10
+      opts.url = 'redis:///1'
     end
 
-    ...
 
-    Redis::EM::Mutex.stop_watcher
-    EM.stop
-  end
+    EM.synchrony do
+      Redis::EM::Mutex.synchronize('resource.lock') do
+        # ... do something with resource
+      end
+
+      # or 
+
+      mutex = Redis::EM::Mutex.new('resource.lock')
+      mutex.synchronize do
+        # ... do something with resource
+      end
+
+      # or
+
+      begin
+        mutex.lock
+        # ... do something with resource
+      ensure
+        mutex.unlock
+      end
+
+      # ...
+
+      Redis::EM::Mutex.stop_watcher
+      EM.stop
+    end
 ```
 
 ### Namespaces
 
 ```ruby
-  Redis::EM::Mutex.setup(ns: 'my_namespace', ....)
+  Redis::EM::Mutex.setup(ns: 'my_namespace')
 
   # or multiple namespaces:
 
@@ -119,9 +118,10 @@ USAGE
 
   EM.synchrony do
     ns.synchronize('foo') do
-      .... do something with foo
+      # .... do something with foo
     end
-    ...
+
+    # ...
     EM.stop
   end
 ```
@@ -131,9 +131,10 @@ USAGE
 ```ruby
   EM.synchrony do
     Redis::EM::Mutex.synchronize('foo', 'bar', 'baz') do
-      .... do something with foo, bar and baz
+      # .... do something with foo, bar and baz
     end
-    ...
+
+    # ...
     EM.stop
   end
 ```
@@ -144,14 +145,14 @@ USAGE
   EM.synchrony do
     begin
       Redis::EM::Mutex.synchronize('foo', 'bar', block: 0.25) do
-        .... do something with foo and bar
+        # .... do something with foo and bar
       end
     rescue Redis::EM::Mutex::MutexTimeout
-      ... locking timed out
+      # ... locking timed out
     end
 
     Redis::EM::Mutex.synchronize('foo', 'bar', expire: 60) do |mutex|
-      .... do something with foo and bar in less than 60 seconds
+      # .... do something with foo and bar in less than 60 seconds
       if mutex.refresh(120)
         # now we have additional 120 seconds until lock expires
       else
@@ -159,7 +160,7 @@ USAGE
       end
     end
 
-    ...
+    # ...
     EM.stop
   end
 ```
@@ -176,8 +177,9 @@ The locking scope will be Mutex global namespace + class name + method name.
   
     auto_mutex
     def critical_run
-      ... do some critical stuff
-      ....only one fiber in one process on one machine is executing this instance method of any instance of defined class
+      # ... do some critical stuff
+      # ....only one fiber in one process on one machine is executing
+      #     this instance method of any instance of defined class
     end
 
     auto_mutex expire: 100, ns: '**TheClass**'
@@ -185,29 +187,29 @@ The locking scope will be Mutex global namespace + class name + method name.
   
     auto_mutex # start and stop will be protected
     def start
-      ...
+      # ...
     end
 
     def stop
-      ...
+      # ...
     end
 
     no_auto_mutex
     def some_unprotected_method
-      ...
+      # ...
     end
 
     auto_mutex :run_long, expire: 100000, block: 10, on_timeout: :cant_run
     def run_long
-      ...
+      # ...
     end
 
     def cant_run
-      ...
+      # ...
     end
 
     def foo
-      ...
+      # ...
     end
     auto_mutex :foo, block: 0, on_timeout: proc { puts 'bar!' }
 
@@ -308,6 +310,7 @@ You may safely fork process while running event reactor and having locked semaph
 The locked semaphores in newly forked process will become unlocked while
 their locked status in parent process will be preserved.
 
+
 ```ruby
   mutex = Redis::EM::Mutex.new('resource1', 'resource2', expire: 60)
 
@@ -322,9 +325,10 @@ their locked status in parent process will be preserved.
           mutex.locked? # true
           mutex.owned?  # true
 
-          ....
+          # ...
         end
-        ...
+
+        # ...
         Redis::EM::Mutex.stop_watcher
         EM.stop
       end.resume
@@ -336,7 +340,7 @@ their locked status in parent process will be preserved.
     mutex.unlock
     mutex.owned?  # false
 
-    ...
+    # ...
     Redis::EM::Mutex.stop_watcher
     EM.stop
   end
