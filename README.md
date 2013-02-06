@@ -8,7 +8,7 @@ Author::    Rafał Michalski  (mailto:rafal@yeondir.com)
 DESCRIPTION
 -----------
 
-*redis-em-mutex* is the cross server-process-fiber EventMachine + Redis based semaphore.
+__redis-em-mutex__ is the cross server-process-fiber EventMachine + Redis based semaphore.
 
 FEATURES
 --------
@@ -46,15 +46,21 @@ REQUIREMENTS
 INSTALL
 -------
 
+```
   $ [sudo] gem install redis-em-mutex
+```
 
 #### Gemfile
 
+```ruby
   gem "redis-em-mutex", "~> 0.2.1"
+```
 
 #### Github
 
+```
   git clone git://github.com/royaltm/redis-em-mutex.git
+```
 
 USAGE
 -----
@@ -339,7 +345,7 @@ their locked status in parent process will be preserved.
 #### Redis factory
 
 Want to use some non-standard redis options or customized client for semaphore watcher and/or redis pool?
-Use :redis_factory option then.
+Use `:redis_factory` option then.
 
 ```ruby
   require 'redis-sentinel'
