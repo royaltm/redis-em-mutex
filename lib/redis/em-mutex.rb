@@ -393,7 +393,7 @@ class Redis
         def ns; @@ns; end
         def ns=(namespace); @@ns = namespace; end
         alias_method :namespace, :ns
-        alias_method :'namespace=', :'ns='
+        alias_method :namespace=, :ns=
 
         # Default value of expiration timeout in seconds.
         def default_expire; @@default_expire; end
