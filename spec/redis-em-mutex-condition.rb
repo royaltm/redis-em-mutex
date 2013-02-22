@@ -71,7 +71,7 @@ describe Redis::EM::Mutex do
       ::EM::Synchrony.next_tick do
         begin
           mutex.owned?.should be false
-          mutex.lock.should be true
+          mutex.lock(0.001).should be true
           mutex.owned?.should be true
           mutex.wakeup(fiber)
           ::EM::Synchrony.sleep(0.2)
