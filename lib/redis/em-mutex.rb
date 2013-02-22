@@ -82,6 +82,7 @@ class Redis
         @multi = !@names.one?
         @ns = opts[:ns] || @@ns
         @ns_names = @ns ? @names.map {|n| "#@ns:#{n}".freeze }.freeze : @names.map {|n| n.to_s.dup.freeze }.freeze
+        @marsh_names = Marshal.dump(@ns_names)
         self.expire_timeout = opts[:expire] if opts.key?(:expire)
         self.block_timeout = opts[:block] if opts.key?(:block)
         self.extend(@@implementation)

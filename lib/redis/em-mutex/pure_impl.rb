@@ -142,10 +142,7 @@ class Redis
               @ns_names.each do |name|
                 r.watch(name) do
                   if r.get(name) == lock_full_ident
-                    if (r.multi {|multi|
-                        multi.del(name)
-                        multi.publish SIGNAL_QUEUE_CHANNEL, Marshal.dump([name])
-                      })
+                    if (r.multi {|multi| multi.del(name) })
                       sem_left -= 1
                     end
                   else
@@ -153,6 +150,7 @@ class Redis
                   end
                 end
               end
+              r.publish SIGNAL_QUEUE_CHANNEL, @marsh_names if Time.now.to_f < @locked_id.to_f
             end
             @locked_owner_id = @locked_id = nil
           end
@@ -203,7 +201,6 @@ class Redis
                     r.multi do |multi|
                       expired_names = expired_names.compact
                       multi.del(*expired_names)
-                      multi.publish SIGNAL_QUEUE_CHANNEL, Marshal.dump(expired_names)
                     end
                   else
                     r.unwatch
