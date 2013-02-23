@@ -15,8 +15,8 @@ describe Redis::EM::Mutex do
       ::EM.add_timer(0.25) do
         mutex.wakeup(fiber)
       end
-      mutex.sleep.should be_within(0.01).of(0.25)
-      (Time.now - start).should be_within(0.01).of(0.25)
+      mutex.sleep.should be_within(0.015).of(0.25)
+      (Time.now - start).should be_within(0.015).of(0.25)
       mutex.owned?.should be true
       mutex.unlock!.should be_true
     ensure
