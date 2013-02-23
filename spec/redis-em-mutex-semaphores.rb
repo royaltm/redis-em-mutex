@@ -418,6 +418,31 @@ describe Redis::EM::Mutex do
     end
   end
 
+  it "should not raise deadlock exception when none is expected" do
+    mutex = described_class.new(*@lock_names, expire: 10000)
+    f = Fiber.current
+    count = 0
+    200.times do
+      EM::Synchrony.next_tick do
+        begin
+          count+=1
+          5.times do
+            mutex.synchronize do
+              EM::Synchrony.sleep(0.0001)
+            end
+          end
+          count-=1
+          f.resume if count.zero? && f
+        rescue Exception => e
+          f.resume e
+        end
+      end
+    end
+    e = Fiber.yield
+    f = nil
+    raise e if e
+  end
+
   around(:each) do |testcase|
     @after_em_stop = nil
     @exception = nil
