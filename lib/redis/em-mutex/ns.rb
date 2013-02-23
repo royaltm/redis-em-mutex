@@ -27,7 +27,7 @@ class Redis
           Redis::EM::Mutex.new(*args)
         end
 
-        # Attempts to grab the lock and waits if it isn’t available.
+        # Attempts to grab the lock and waits if it isn't available.
         # 
         # See: Redis::EM::Mutex.lock
         def lock(*args)

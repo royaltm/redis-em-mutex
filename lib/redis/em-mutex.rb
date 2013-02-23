@@ -120,7 +120,7 @@ class Redis
       end
 
       # Releases the lock unconditionally.
-      # If the semaphore wasn’t locked by the current owner it is silently ignored.
+      # If the semaphore wasn't locked by the current owner it is silently ignored.
       # Returns self.
       def unlock
         unlock!
@@ -136,7 +136,7 @@ class Redis
       alias_method :_wakeup, :wakeup
 
       # Releases the lock and sleeps `timeout` seconds if it is given and non-nil or forever.
-      # Raises MutexError if mutex wasn’t locked by the current owner.
+      # Raises MutexError if mutex wasn't locked by the current owner.
       # Raises MutexTimeout if #block_timeout= was set and timeout
       # occured while locking after sleep.
       # If code block is provided it is executed after waking up, just before grabbing a lock.
@@ -439,7 +439,7 @@ class Redis
           raise NotImplementedError
         end
 
-        # Attempts to grab the lock and waits if it isn’t available.
+        # Attempts to grab the lock and waits if it isn't available.
         # Raises MutexError if mutex was locked by the current owner
         # or if used before Mutex.setup.
         # Raises ArgumentError on invalid options.

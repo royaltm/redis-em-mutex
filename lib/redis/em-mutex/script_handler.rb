@@ -151,7 +151,7 @@ class Redis
           return removed == @ns_names.length && self
         end
 
-        # Attempts to grab the lock and waits if it isn’t available.
+        # Attempts to grab the lock and waits if it isn't available.
         # Raises MutexError if mutex was locked by the current owner.
         # Returns `true` if lock was successfully obtained.
         # Returns `false` if lock wasn't available within `block_timeout` seconds.
