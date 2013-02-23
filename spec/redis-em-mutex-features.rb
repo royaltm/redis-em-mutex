@@ -119,6 +119,15 @@ describe Redis::EM::Mutex do
     described_class.class_variable_get(:@@uuid).should eq @uuid
   end
 
+  it "owner_ident should begin with uuid and end with owner id" do
+    ident = described_class.new(:dummy).owner_ident
+    ident.should start_with(@uuid)
+    ident.should end_with(Fiber.current.__id__.to_s)
+    ident = described_class.new(:dummy, owner:'__me__').owner_ident
+    ident.should start_with(@uuid)
+    ident.should end_with('__me__')
+  end
+
   around(:each) do |testcase|
     @after_em_stop = nil
     @exception = nil

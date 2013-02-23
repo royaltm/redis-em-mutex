@@ -13,9 +13,9 @@ class Redis
           if (owner = opts[:owner])
             self.define_singleton_method(:owner_ident) do |lock_id = nil|
               if lock_id
-                "#uuid$#$$@#{owner} #{lock_id}"
+                "#{uuid}$#$$@#{owner} #{lock_id}"
               else
-                "#uuid$#$$@#{owner}"
+                "#{uuid}$#$$@#{owner}"
               end
             end
             opts = nil
@@ -240,9 +240,9 @@ class Redis
 
         def owner_ident(lock_id = nil)
           if lock_id
-            "#uuid$#$$@#{Fiber.current.__id__} #{lock_id}"
+            "#{uuid}$#$$@#{Fiber.current.__id__} #{lock_id}"
           else
-            "#uuid$#$$@#{Fiber.current.__id__}"
+            "#{uuid}$#$$@#{Fiber.current.__id__}"
           end
         end
 
