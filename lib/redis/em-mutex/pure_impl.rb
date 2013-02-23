@@ -115,17 +115,15 @@ class Redis
           if @locked_id && owner_ident(@locked_id) == (lock_full_ident = @locked_owner_id)
             new_lock_id = (Time.now + (expire_timeout.to_f.nonzero? || self.expire_timeout)).to_f.to_s
             new_lock_full_ident = owner_ident(new_lock_id)
-            redis_pool.execute(false) do |r|
-              r.watch(*@ns_names) do
-                if r.mget(*@ns_names).all? {|v| v == lock_full_ident}
-                  if r.multi {|m| m.mset(*@ns_names.map {|k| [k, new_lock_full_ident]}.flatten)}
-                    @locked_id = new_lock_id
-                    @locked_owner_id = new_lock_full_ident
-                    ret = true
-                  end
-                else
-                  r.unwatch
+            redis_pool.watch(*@ns_names) do |r|
+              if r.mget(*@ns_names).all? {|v| v == lock_full_ident}
+                if r.multi {|m| m.mset(*@ns_names.map {|k| [k, new_lock_full_ident]}.flatten)}
+                  @locked_id = new_lock_id
+                  @locked_owner_id = new_lock_full_ident
+                  ret = true
                 end
+              else
+                r.unwatch
               end
             end
           end
@@ -141,20 +139,21 @@ class Redis
           sem_left = @ns_names.length
           if (locked_id = @locked_id) && owner_ident(locked_id) == (lock_full_ident = @locked_owner_id)
             @locked_owner_id = @locked_id = nil
-            redis_pool.execute(false) do |r|
-              @ns_names.each do |name|
-                r.watch(name) do
-                  if r.get(name) == lock_full_ident
-                    if (r.multi {|multi| multi.del(name) })
-                      sem_left -= 1
-                    end
-                  else
-                    r.unwatch
+            @ns_names.each do |name|
+              redis_pool.watch(name) do |r|
+                if r.get(name) == lock_full_ident
+                  if (r.multi {|multi|
+                    multi.del(name)
+                    multi.publish SIGNAL_QUEUE_CHANNEL, @marsh_names if !@multi && Time.now.to_f < locked_id.to_f
+                  })
+                    sem_left -= 1
                   end
+                else
+                  r.unwatch
                 end
               end
             end
-            redis_pool.publish SIGNAL_QUEUE_CHANNEL, @marsh_names if Time.now.to_f < locked_id.to_f
+            redis_pool.publish SIGNAL_QUEUE_CHANNEL, @marsh_names if @multi && Time.now.to_f < locked_id.to_f
           end
           sem_left.zero? && self
         end
@@ -186,27 +185,25 @@ class Redis
             until try_lock
               start_time = Time.now.to_f
               expire_time = nil
-              redis_pool.execute(false) do |r|
-                r.watch(*names) do
-                  expired_names = names.zip(r.mget(*names)).map do |name, lock_value|
-                    if lock_value
-                      owner, exp_id = lock_value.split ' '
-                      exp_time = exp_id.to_f
-                      expire_time = exp_time if expire_time.nil? || exp_time < expire_time
-                      raise MutexError, "deadlock; recursive locking #{owner}" if owner == ident_match
-                      if exp_time < start_time
-                        name
-                      end
+              redis_pool.watch(*names) do |r|
+                expired_names = names.zip(r.mget(*names)).map do |name, lock_value|
+                  if lock_value
+                    owner, exp_id = lock_value.split ' '
+                    exp_time = exp_id.to_f
+                    expire_time = exp_time if expire_time.nil? || exp_time < expire_time
+                    raise MutexError, "deadlock; recursive locking #{owner}" if owner == ident_match
+                    if exp_time < start_time
+                      name
                     end
                   end
-                  if expire_time && expire_time < start_time
-                    r.multi do |multi|
-                      expired_names = expired_names.compact
-                      multi.del(*expired_names)
-                    end
-                  else
-                    r.unwatch
+                end
+                if expire_time && expire_time < start_time
+                  r.multi do |multi|
+                    expired_names = expired_names.compact
+                    multi.del(*expired_names)
                   end
+                else
+                  r.unwatch
                 end
               end
               timeout = (expire_time = expire_time.to_f) - start_time
