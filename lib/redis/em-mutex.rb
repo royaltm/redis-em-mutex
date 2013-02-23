@@ -301,8 +301,8 @@ class Redis
         end
 
         def setup_handler(handler = nil)
-          handler||= ENV['REDIS_EM_MUTEX_HANDLER'] || :auto
-          if handler.to_sym == :auto
+          handler = (handler || ENV['REDIS_EM_MUTEX_HANDLER'] || :auto).to_sym.downcase
+          if handler == :auto
             return unless ::EM.reactor_running?
             handler = :script
             begin
