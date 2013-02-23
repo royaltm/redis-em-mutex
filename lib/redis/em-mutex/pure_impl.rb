@@ -4,6 +4,8 @@ class Redis
       module PureImplementationMixin
         include Mutex::Errors
 
+        def self.can_refresh_expired?; true end
+
         private
 
         def post_init(opts)

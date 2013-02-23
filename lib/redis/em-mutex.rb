@@ -56,6 +56,13 @@ class Redis
 
       public
 
+      def self.can_refresh_expired?
+        @@implementation.can_refresh_expired?
+      end
+      def can_refresh_expired?
+        @@implementation.can_refresh_expired?
+      end
+
       # Creates a new cross machine/process/fiber semaphore
       #
       #   Redis::EM::Mutex.new(*names, options = {})
