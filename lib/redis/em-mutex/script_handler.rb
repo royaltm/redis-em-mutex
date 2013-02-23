@@ -185,7 +185,7 @@ class Redis
                 @locked_owner_id = ident_match
                 @lock_expire = lock_expire
                 break
-              when 'FOAD'
+              when 'DD'
                 raise MutexError, "deadlock; recursive locking #{ident_match}"
               else
                 expire_time = start_time + (timeout/=1000.0)
@@ -241,7 +241,7 @@ class Redis
 
           # -- lock multi *keys, lock_id, msexpire_at
           # -- > OK
-          # -- > FOAD (deadlock)
+          # -- > DD (deadlock)
           # -- > milliseconds ttl wait
           LOCK_MULTI = <<-EOL
             local size=#KEYS
@@ -261,7 +261,7 @@ class Redis
             local res=redis.call('mget',unpack(KEYS))
             for i=1,size do
               if res[i]==lock then
-                return 'FOAD'
+                return 'DD'
               end
             end
             exp=nil
@@ -346,7 +346,7 @@ class Redis
 
           # -- lock single key, lock_id, msexpire_at
           # -- > OK
-          # -- > FOAD (deadlock)
+          # -- > DD (deadlock)
           # -- > milliseconds ttl wait
           LOCK_SINGLE = <<-EOL
             local key=KEYS[1]
@@ -356,7 +356,7 @@ class Redis
               return 'OK'
             end
             if lock==redis.call('get',key) then
-              return 'FOAD'
+              return 'DD'
             end
             return redis.call('pttl',key)
           EOL
