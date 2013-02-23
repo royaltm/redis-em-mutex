@@ -105,6 +105,15 @@ class Redis
         end
 
         # This method is not used here, but kept for compatability
+        #
+        # Attempts to obtain the lock and returns immediately.
+        # Returns `true` if the lock was granted.
+        # Use Mutex#expire_timeout= to set lock expiration time in secods.
+        # Otherwise global Mutex.default_expire is used.
+        #
+        # This method doesn't capture expired semaphores
+        # and therefore it should NEVER be used under normal circumstances.
+        # Use Mutex#lock with block_timeout = 0 to obtain expired lock without blocking.
         def try_lock
           lock_expire = (Time.now + expire_timeout).to_f
           lock_full_ident = owner_ident
