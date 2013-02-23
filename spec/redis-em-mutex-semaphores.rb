@@ -65,7 +65,7 @@ describe Redis::EM::Mutex do
         mutex.owned?.should be false
         start = Time.now
         mutex.synchronize do
-          (Time.now - start).should be_within(0.015).of(0.26)
+          (Time.now - start).should be_within(0.02).of(0.26)
           locked.should be false
           locked = nil
         end
@@ -96,7 +96,7 @@ describe Redis::EM::Mutex do
         start = Time.now
         mutex.synchronize do
           mutex.owned?.should be true
-          (Time.now - start).should be_within(0.015).of(0.26)
+          (Time.now - start).should be_within(0.02).of(0.26)
           locked.should be false
         end
         mutex.owned?.should be false
@@ -105,7 +105,7 @@ describe Redis::EM::Mutex do
           begin
             locked.should be true
             described_class.new(name).synchronize do
-              (Time.now - start).should be_within(0.015).of(0.26)
+              (Time.now - start).should be_within(0.02).of(0.26)
               locked.should be_an_instance_of Fixnum
               locked-= 1
             end
@@ -372,7 +372,12 @@ describe Redis::EM::Mutex do
       mutex.expires_at.should eq Time.at(mutex.expiration_timestamp)
       mutex.expires_at.should be < Time.now
       start = Time.now
-      mutex.refresh.should be true
+      if mutex.can_refresh_expired?
+        mutex.refresh.should be true
+      else
+        mutex.refresh.should be false
+        mutex.lock.should be true
+      end
       now = Time.now
       mutex.expires_in.should be_within(0.01).of(mutex.expire_timeout - (now - start))
       EM::Synchrony.sleep mutex.expires_in + 0.001
