@@ -216,9 +216,9 @@ class Redis
         end
 
         module Scripts
-          # -- lock multi *keys, lock_id, msexpire_at
-          # -- > 1
-          # -- > 0
+          # * lock multi *keys, lock_id, msexpire_at
+          # * > 1
+          # * > 0
           TRY_LOCK_MULTI = <<-EOL
             local size=#KEYS
             local lock=ARGV[1]
@@ -237,10 +237,10 @@ class Redis
             return 0
           EOL
 
-          # -- lock multi *keys, lock_id, msexpire_at
-          # -- > OK
-          # -- > DD (deadlock)
-          # -- > milliseconds ttl wait
+          # * lock multi *keys, lock_id, msexpire_at
+          # * > OK
+          # * > DD (deadlock)
+          # * > milliseconds ttl wait
           LOCK_MULTI = <<-EOL
             local size=#KEYS
             local lock=ARGV[1]
@@ -272,8 +272,8 @@ class Redis
             return exp
           EOL
 
-          # -- unlock multiple *keys, lock_id
-          # -- > #keys unlocked
+          # * unlock multiple *keys, lock_id
+          # * > #keys unlocked
           UNLOCK_MULTI = <<-EOL
             local size=#KEYS
             local lock=ARGV[1]
@@ -290,9 +290,9 @@ class Redis
             return #args
           EOL
 
-          # -- refresh multi *keys, lock_id, msexpire_at
-          # -- > 1
-          # -- > 0
+          # * refresh multi *keys, lock_id, msexpire_at
+          # * > 1
+          # * > 0
           REFRESH_MULTI = <<-EOL
             local size=#KEYS
             local lock=ARGV[1]
@@ -318,21 +318,21 @@ class Redis
             return 0
           EOL
 
-          # -- locked? multi *keys
-          # -- > 1
-          # -- > 0
+          # * locked? multi *keys
+          # * > 1
+          # * > 0
           IS_LOCKED_MULTI = <<-EOL
             for i=1,#KEYS do
-              if redis.call('exists',KEYS[i])==1 then
+              if 1==redis.call('exists',KEYS[i]) then
                 return 1
               end
             end
             return 0
           EOL
 
-          # -- try_lock single key, lock_id, msexpire_at
-          # -- > 1
-          # -- > 0
+          # * try_lock single key, lock_id, msexpire_at
+          # * > 1
+          # * > 0
           TRY_LOCK_SINGLE = <<-EOL
             local key=KEYS[1]
             local lock=ARGV[1]
@@ -342,10 +342,10 @@ class Redis
             return 0
           EOL
 
-          # -- lock single key, lock_id, msexpire_at
-          # -- > OK
-          # -- > DD (deadlock)
-          # -- > milliseconds ttl wait
+          # * lock single key, lock_id, msexpire_at
+          # * > OK
+          # * > DD (deadlock)
+          # * > milliseconds ttl wait
           LOCK_SINGLE = <<-EOL
             local key=KEYS[1]
             local lock=ARGV[1]
@@ -359,9 +359,9 @@ class Redis
             return redis.call('pttl',key)
           EOL
 
-          # -- unlock single key, lock_id
-          # -- > 1
-          # -- > 0
+          # * unlock single key, lock_id
+          # * > 1
+          # * > 0
           UNLOCK_SINGLE = <<-EOL
             local key=KEYS[1]
             local res=redis.call('get',key)
@@ -372,9 +372,9 @@ class Redis
             end
           EOL
 
-          # -- refresh single key, lock_id, msexpire_at
-          # -- > 1
-          # -- > 0
+          # * refresh single key, lock_id, msexpire_at
+          # * > 1
+          # * > 0
           REFRESH_SINGLE = <<-EOL
             local key=KEYS[1]
             local res=redis.call('get',key)
