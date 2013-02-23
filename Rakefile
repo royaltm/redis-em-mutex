@@ -5,17 +5,30 @@ task :default => [:test]
 $gem_name = "redis-em-mutex"
 
 desc "Run spec tests"
-task :test do
-  Dir["spec/#{$gem_name}-*.rb"].each do |spec|
-    sh({'REDIS_EM_MUTEX_HANDLER' => nil}, "rspec #{spec}")
+namespace :test do
+
+  task :all => [:auto, :pure, :script]
+
+  task :auto do
+    Dir["spec/#{$gem_name}-*.rb"].each do |spec|
+      sh({'REDIS_EM_MUTEX_HANDLER' => nil}, "rspec #{spec}")
+    end
   end
-  Dir["spec/#{$gem_name}-*.rb"].each do |spec|
-    sh({'REDIS_EM_MUTEX_HANDLER' => 'pure'}, "rspec #{spec}")
+
+  task :pure do
+    Dir["spec/#{$gem_name}-*.rb"].each do |spec|
+      sh({'REDIS_EM_MUTEX_HANDLER' => 'pure'}, "rspec #{spec}")
+    end
   end
-  Dir["spec/#{$gem_name}-*.rb"].each do |spec|
-    sh({'REDIS_EM_MUTEX_HANDLER' => 'script'}, "rspec #{spec}")
+
+  task :script do
+    Dir["spec/#{$gem_name}-*.rb"].each do |spec|
+      sh({'REDIS_EM_MUTEX_HANDLER' => 'script'}, "rspec #{spec}")
+    end
   end
 end
+
+task :test => [:'test:all']
 
 desc "Build the gem"
 task :gem do
