@@ -53,7 +53,7 @@ $ [sudo] gem install redis-em-mutex
 #### Gemfile
 
 ```ruby
-gem "redis-em-mutex", "~> 0.2.2"
+gem "redis-em-mutex", "~> 0.2.3"
 ```
 
 #### Github
