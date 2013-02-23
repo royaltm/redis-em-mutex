@@ -139,7 +139,8 @@ class Redis
         # of the names have been unlocked successfully.
         def unlock!
           sem_left = @ns_names.length
-          if @locked_id && owner_ident(@locked_id) == (lock_full_ident = @locked_owner_id)
+          if (locked_id = @locked_id) && owner_ident(locked_id) == (lock_full_ident = @locked_owner_id)
+            @locked_owner_id = @locked_id = nil
             redis_pool.execute(false) do |r|
               @ns_names.each do |name|
                 r.watch(name) do
@@ -152,9 +153,8 @@ class Redis
                   end
                 end
               end
-              r.publish SIGNAL_QUEUE_CHANNEL, @marsh_names if Time.now.to_f < @locked_id.to_f
+              r.publish SIGNAL_QUEUE_CHANNEL, @marsh_names if Time.now.to_f < locked_id.to_f
             end
-            @locked_owner_id = @locked_id = nil
           end
           sem_left.zero? && self
         end
