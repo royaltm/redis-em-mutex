@@ -7,7 +7,13 @@ $gem_name = "redis-em-mutex"
 desc "Run spec tests"
 task :test do
   Dir["spec/#{$gem_name}-*.rb"].each do |spec|
-    sh "rspec #{spec}"
+    sh({'REDIS_EM_MUTEX_HANDLER' => nil}, "rspec #{spec}")
+  end
+  Dir["spec/#{$gem_name}-*.rb"].each do |spec|
+    sh({'REDIS_EM_MUTEX_HANDLER' => 'pure'}, "rspec #{spec}")
+  end
+  Dir["spec/#{$gem_name}-*.rb"].each do |spec|
+    sh({'REDIS_EM_MUTEX_HANDLER' => 'script'}, "rspec #{spec}")
   end
 end
 
