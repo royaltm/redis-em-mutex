@@ -56,11 +56,17 @@ class Redis
 
       public
 
+      # Selected implementation handler module name
       def self.handler; @@handler && @@handler.name end
 
+      # Whether selected implementation handler
+      # supports refreshing of already expired locks.
       def self.can_refresh_expired?
         @@handler.can_refresh_expired?
       end
+
+      # Whether selected implementation handler
+      # supports refreshing of already expired locks.
       def can_refresh_expired?
         @@handler.can_refresh_expired?
       end

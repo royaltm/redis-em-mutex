@@ -17,9 +17,9 @@ FEATURES
 * no CPU-intensive sleep/polling while waiting for lock to become available
 * fibers waiting for the lock are signalled via Redis channel as soon as the lock
   has been released (~< 1 ms)
+* alternative fast handler (server-side LUA script based - redis-server 2.6.x)
 * multi-locks (all-or-nothing) locking (to prevent possible deadlocks when
   multiple semaphores are required to be locked at once)
-* best served with EM-Synchrony (uses EM::Synchrony::ConnectionPool internally)
 * fiber-safe
 * deadlock detection (only trivial cases: locking twice the same resource from the same owner)
 * mandatory lock expiration (with refreshing)
@@ -39,7 +39,7 @@ REQUIREMENTS
 ------------
 
 * ruby >= 1.9 (tested: ruby 1.9.3p374, 1.9.3-p194, 1.9.2-p320, 1.9.1-p378)
-* http://github.com/redis/redis-rb ~> 3.0.1
+* http://github.com/redis/redis-rb ~> 3.0.2
 * http://rubyeventmachine.com ~> 1.0.0
 * (optional) http://github.com/igrigorik/em-synchrony
 
@@ -53,7 +53,7 @@ $ [sudo] gem install redis-em-mutex
 #### Gemfile
 
 ```ruby
-gem "redis-em-mutex", "~> 0.2.3"
+gem "redis-em-mutex", "~> 0.3.0"
 ```
 
 #### Github
@@ -61,6 +61,27 @@ gem "redis-em-mutex", "~> 0.2.3"
 ```
 git clone git://github.com/royaltm/redis-em-mutex.git
 ```
+
+UPGRADING
+---------
+
+0.2.x -> 0.3.x
+
+To upgrade redis-em-mutex on production from 0.2.x to 0.3.x you must make sure the correct handler has been
+selected. See more on HANDLERS below.
+
+The "pure" and "script" handlers are not compatible. Two different handlers must not utilize the same semaphore-key space.
+
+Because only the "pure" handler is compatible with redis-em-mutex 0.2.x, when upgrading live production make sure to add
+`handler: :pure` option to `Redis::EM::Mutex.setup` or set the environment variable on production app servers:
+
+```sh
+  REDIS_EM_MUTEX_HANDLER=pure
+  export REDIS_EM_MUTEX_HANDLER
+```
+Upgrading from "pure" to "script" handler requires that all "pure" handler locks MUST BE DELETED from redis-server beforehand.
+Neglecting that will result in possible deadlocks. The "script" handler assumes that the lock expiration process is handled
+by redis-server's PEXPIREAT feature. The "pure" handler does not set timeouts on keys. It handles expiration differently.
 
 USAGE
 -----
@@ -107,6 +128,57 @@ USAGE
     end
 ```
 
+### Handlers
+
+There are 2 different mutex implementations since version 0.3.0.
+
+* The "pure" classic handler utilizes redis optimistic transaction commands (watch/multi).
+  This handler works with redis-server 2.4.x and later.
+* The new "script" handler takes advantage of fast atomic server side operations written in LUA.
+  Therefore the "script" handler is compatible only with redis-server 2.6.x and later.
+
+__IMPORTANT__: The pure and script implementations are not compatible. The value they store in semaphore keys are different.
+You can not operate on the same set of keys using both handlers from e.g. different applications or application versions.
+See UPGRADING for more info on this.
+
+You choose your preferred implementation with `handler` option:
+
+```ruby
+    Redis::EM::Mutex.setup(handler: :script)
+    Redis::EM::Mutex.handler # "Redis::EM::Mutex::ScriptHandlerMixin"
+
+    # or
+
+    Redis::EM::Mutex.setup do |opts|
+      opts.handler = :pure
+    end
+    Redis::EM::Mutex.handler # "Redis::EM::Mutex::PureHandlerMixin"
+```
+
+You may also setup `REDIS_EM_MUTEX_HANDLER` environment variable to preferred implementation name.
+Passing `handler` option to setup method overrides environment variable.
+
+The default handler option is `auto` which selects best handler available for your redis-server.
+It's good for quick sandbox setup, however you should set explicitly which handler you require on production.
+
+The differences:
+
+* The "script" handler is at least twice as fast as "pure" handler. It gains even more
+  with multi-locks and during high load. See BENCHMARK.md.
+
+* The "script" implementation handler uses PEXPIREAT to mark semaphore life-time.
+  The "pure" handler stores semaphore expiry timestamp in key value.
+  Therefore the "script" handler can't refresh semaphores once they are expired.
+  The pure handler on the other hand could refresh expired semaphore but only
+  if nothing else has locked on that expired key.
+
+To detect feature of the current handler:
+
+```ruby
+  Redis::EM::Mutex.can_refresh_expired?           # true / false
+  Redis::EM::Mutex.new(:foo).can_refresh_expired? # true / false
+```
+
 ### Namespaces
 
 ```ruby
@@ -127,6 +199,15 @@ USAGE
 ```
 
 ### Multi-locks
+
+They enable you to lock more then one key at the same time. The muliti key semaphores are deadlock-safe.
+The classic deadlock example scenario with multiple resources:
+
+* A acquires lock on resource :foo
+* B acquires lock on resource :bar
+* A tries to lock on resource :bar still keeping the :foo
+* but at the same time B tries to acquire :foo while keeping the :bar.
+* The deadlock occurs.
 
 ```ruby
   EM.synchrony do
@@ -218,8 +299,8 @@ The locking scope will be Mutex global namespace + class name + method name.
 
 ### ConditionVariable
 
-Redis::EM::Mutex may be used with EventMachine::Synchrony::Thread::ConditionVariable
-in place of EventMachine::Synchrony::Thread::Mutex.
+`Redis::EM::Mutex` may be used with `EventMachine::Synchrony::Thread::ConditionVariable`
+in place of `EventMachine::Synchrony::Thread::Mutex`.
 
 ```ruby
   mutex = Redis::EM::Mutex.new('resource')

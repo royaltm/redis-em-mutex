@@ -104,14 +104,12 @@ class Redis
           @lock_expire if @lock_expire && owner_ident == @locked_owner_id
         end
 
-        # This method is not used here, but kept for compatability
-        #
         # Attempts to obtain the lock and returns immediately.
         # Returns `true` if the lock was granted.
         # Use Mutex#expire_timeout= to set lock expiration time in secods.
         # Otherwise global Mutex.default_expire is used.
         #
-        # This method doesn't capture expired semaphores
+        # This method captures expired semaphores only in "script" implementation
         # and therefore it should NEVER be used under normal circumstances.
         # Use Mutex#lock with block_timeout = 0 to obtain expired lock without blocking.
         def try_lock
