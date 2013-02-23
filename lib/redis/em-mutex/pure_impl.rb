@@ -153,8 +153,8 @@ class Redis
                   end
                 end
               end
-              r.publish SIGNAL_QUEUE_CHANNEL, @marsh_names if Time.now.to_f < locked_id.to_f
             end
+            redis_pool.publish SIGNAL_QUEUE_CHANNEL, @marsh_names if Time.now.to_f < locked_id.to_f
           end
           sem_left.zero? && self
         end
