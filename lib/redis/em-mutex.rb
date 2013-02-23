@@ -237,6 +237,7 @@ class Redis
         # - :redis    - initialized ConnectionPool of Redis clients.
         def setup(opts = {})
           stop_watcher
+          # @@implementation = ScriptImplementationMixin
           @@implementation = PureImplementationMixin
           @watcher_subscribed = nil
           opts = OpenStruct.new(opts)
@@ -443,3 +444,4 @@ end
 
 require 'redis/em-mutex/version'
 require 'redis/em-mutex/pure_impl' # TODO: load on demand
+# require 'redis/em-mutex/script_impl' # TODO: load on demand
