@@ -17,7 +17,7 @@ FEATURES
 * no CPU-intensive sleep/polling while waiting for lock to become available
 * fibers waiting for the lock are signalled via Redis channel as soon as the lock
   has been released (~< 1 ms)
-* alternative fast handler (server-side LUA script based - redis-server 2.6.x)
+* alternative fast "script" handler (server-side LUA script based - redis-server 2.6.x)
 * multi-locks (all-or-nothing) locking (to prevent possible deadlocks when
   multiple semaphores are required to be locked at once)
 * fiber-safe
