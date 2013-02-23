@@ -2,7 +2,7 @@ require 'digest'
 class Redis
   module EM
     class Mutex
-      module ScriptImplementationMixin
+      module ScriptHandlerMixin
         include Mutex::Errors
 
         def self.can_refresh_expired?; false end
@@ -169,13 +169,13 @@ class Redis
           names = @ns_names
           timer = fiber = nil
           try_again = false
-          handler = proc do
+          sig_proc = proc do
             try_again = true
             ::EM.next_tick { fiber.resume if fiber } if fiber
           end
           begin
             Mutex.start_watcher unless watching?
-            queues = names.map {|n| signal_queue[n] << handler }
+            queues = names.map {|n| signal_queue[n] << sig_proc }
             ident_match = owner_ident
             loop do
               start_time = Time.now.to_f
@@ -212,7 +212,7 @@ class Redis
           ensure
             timer.cancel if timer
             timer = nil
-            queues.each {|q| q.delete handler }
+            queues.each {|q| q.delete sig_proc }
             names.each {|n| signal_queue.delete(n) if signal_queue[n].empty? }
           end
         end

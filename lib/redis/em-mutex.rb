@@ -41,7 +41,7 @@ class Redis
       @@watching = false
       @@signal_queue = Hash.new {|h,k| h[k] = []}
       @@ns = nil
-      @@implementation = nil
+      @@handler = nil
       @@uuid ||= if SecureRandom.respond_to?(:uuid)
         SecureRandom.uuid
       else
@@ -56,11 +56,13 @@ class Redis
 
       public
 
+      def self.handler; @@handler && @@handler.name end
+
       def self.can_refresh_expired?
-        @@implementation.can_refresh_expired?
+        @@handler.can_refresh_expired?
       end
       def can_refresh_expired?
-        @@implementation.can_refresh_expired?
+        @@handler.can_refresh_expired?
       end
 
       # Creates a new cross machine/process/fiber semaphore
@@ -78,7 +80,8 @@ class Redis
       # Raises MutexError if used before Mutex.setup.
       # Raises ArgumentError on invalid options.
       def initialize(*args)
-        raise MutexError, "call #{self.class}::setup first" unless @@implementation
+        raise MutexError, "call #{self.class}::setup first" unless @@redis_pool
+        self.class.setup_handler unless @@handler
 
         opts = args.last.kind_of?(Hash) ? args.pop : {}
 
@@ -92,7 +95,7 @@ class Redis
         @marsh_names = Marshal.dump(@ns_names)
         self.expire_timeout = opts[:expire] if opts.key?(:expire)
         self.block_timeout = opts[:block] if opts.key?(:block)
-        self.extend(@@implementation)
+        self.extend(@@handler)
         post_init(opts)
       end
 
@@ -207,7 +210,11 @@ class Redis
         # global options:
         #
         # - :connection_pool_class - default is Redis::EM::ConnectionPool
-        # - :redis_factory - default is proc {|opts| Redis.new opts }
+        # - :redis_factory - default is proc {|redis_opts| Redis.new redis_opts }
+        # - :handler - default is ENV['REDIS_EM_MUTEX_HANDLER'] or :auto
+        #     :pure   - client commands based (redis-server >= 2.4)
+        #     :script - server scripting based (redis-server >= 2.6)
+        #     :auto   - autodetect and choose best available handler
         # - :expire   - sets global Mutex.default_expire 
         # - :ns       - sets global Mutex.namespace
         # - :reconnect_max - maximum num. of attempts to re-establish
@@ -237,8 +244,6 @@ class Redis
         # - :redis    - initialized ConnectionPool of Redis clients.
         def setup(opts = {})
           stop_watcher
-          # @@implementation = ScriptImplementationMixin
-          @@implementation = PureImplementationMixin
           @watcher_subscribed = nil
           opts = OpenStruct.new(opts)
           yield opts if block_given?
@@ -284,6 +289,37 @@ class Redis
           end
           @redis_watcher = @redis_factory[redis_options]
           start_watcher if ::EM.reactor_running?
+
+          case handler = opts.handler || @@handler
+          when Module
+            @@handler = handler
+          when nil, Symbol, String
+            setup_handler(handler)
+          else
+            raise TypeError, 'handler must be Symbol or Module'
+          end
+        end
+
+        def setup_handler(handler = nil)
+          handler||= ENV['REDIS_EM_MUTEX_HANDLER'] || :auto
+          if handler.to_sym == :auto
+            return unless ::EM.reactor_running?
+            handler = :script
+            begin
+              @@redis_pool.script(:exists)
+            rescue Redis::CommandError
+              handler = :pure
+            end
+          end
+          const_name = "#{handler.to_s.capitalize}HandlerMixin"
+          begin
+            unless self.const_defined?(const_name)
+              require "redis/em-mutex/#{handler}_handler"
+            end
+            @@handler = self.const_get(const_name)
+          rescue LoadError, NameError
+            raise "handler: #{handler} not found"
+          end
         end
 
         def ready?
@@ -326,12 +362,12 @@ class Redis
                 end
                 on.message do |channel, message|
                   if channel == SIGNAL_QUEUE_CHANNEL
-                    handlers = {}
+                    sig_match = {}
                     Marshal.load(message).each do |name|
-                      handlers[@@signal_queue[name].first] = true if @@signal_queue.key?(name)
+                      sig_match[@@signal_queue[name].first] = true if @@signal_queue.key?(name)
                     end
-                    handlers.keys.each do |handler|
-                      handler.call if handler
+                    sig_match.keys.each do |sig_proc|
+                      sig_proc.call if sig_proc
                     end
                   end
                 end
@@ -377,7 +413,7 @@ class Redis
           return unless watching?
           raise MutexError, "call #{self.class}::setup first" unless @redis_watcher
           unless @@signal_queue.empty? || force
-            raise MutexError, "can't stop: active signal queue handlers"
+            raise MutexError, "can't stop: semaphores in queue"
           end
           @@watching = false
           if @watcher_subscribed
@@ -436,6 +472,7 @@ class Redis
         def synchronize(*args, &block)
           new(*args).synchronize(&block)
         end
+
       end
 
     end
@@ -443,5 +480,3 @@ class Redis
 end
 
 require 'redis/em-mutex/version'
-require 'redis/em-mutex/pure_impl' # TODO: load on demand
-# require 'redis/em-mutex/script_impl' # TODO: load on demand
