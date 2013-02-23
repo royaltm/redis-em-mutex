@@ -215,6 +215,7 @@ class Redis
       def unlock!
         sem_left = @ns_names.length
         if @locked_id && owner_ident(@locked_id) == (lock_full_ident = @locked_owner_id)
+          @locked_owner_id = @locked_id = nil
           @@redis_pool.execute(false) do |r|
             @ns_names.each do |name|
               r.watch(name) do
@@ -231,7 +232,6 @@ class Redis
               end
             end
           end
-          @locked_owner_id = @locked_id = nil
         end
         sem_left.zero? && self
       end
