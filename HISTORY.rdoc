@@ -1,3 +1,7 @@
+0.2.3
+- fixed: rare but possible race condition in unlock!
+  manifesting as deadlock exception when no deadlock should occur
+
 0.2.2
 - fixed: uuid must be set only once
 - fixed: forking process or setup before reactor is running would hang
