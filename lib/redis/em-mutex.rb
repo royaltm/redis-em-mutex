@@ -206,7 +206,7 @@ class Redis
         #
         # global options:
         #
-        # - :connection_pool_class - default is ::EM::Synchrony::ConnectionPool
+        # - :connection_pool_class - default is Redis::EM::ConnectionPool
         # - :redis_factory - default is proc {|opts| Redis.new opts }
         # - :expire   - sets global Mutex.default_expire 
         # - :ns       - sets global Mutex.namespace
@@ -272,11 +272,11 @@ class Redis
           unless (@@redis_pool = redis)
             unless @connection_pool_class
               begin
-                require 'em-synchrony/connection_pool' unless defined?(::EM::Synchrony::ConnectionPool)
+                require 'redis/em-connection-pool' unless defined?(Redis::EM::ConnectionPool)
               rescue LoadError
-                raise ":connection_pool_class required; could not fall back to EM::Synchrony::ConnectionPool - gem install em-synchrony"
+                raise ":connection_pool_class required; could not fall back to Redis::EM::ConnectionPool"
               end
-              @connection_pool_class = ::EM::Synchrony::ConnectionPool
+              @connection_pool_class = Redis::EM::ConnectionPool
             end
             @@redis_pool = @connection_pool_class.new(size: pool_size) do
               @redis_factory[redis_options]

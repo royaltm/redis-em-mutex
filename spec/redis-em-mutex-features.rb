@@ -1,9 +1,9 @@
 $:.unshift "lib"
 require 'em-synchrony'
-require 'em-synchrony/connection_pool'
+require 'redis/em-connection-pool'
 require 'redis-em-mutex'
 
-class TestDummyConnectionPool < EM::Synchrony::ConnectionPool; end
+class TestDummyConnectionPool < Redis::EM::ConnectionPool; end
 
 describe Redis::EM::Mutex do
 
@@ -47,7 +47,7 @@ describe Redis::EM::Mutex do
     described_class.reconnect_max_retries = 0
     described_class.reconnect_forever?.should be false
     redis_pool = described_class.class_variable_get(:'@@redis_pool')
-    redis_pool.should be_an_instance_of EM::Synchrony::ConnectionPool
+    redis_pool.should be_an_instance_of Redis::EM::ConnectionPool
     redis_pool.should_not be @redis_pool
     redis_pool.client.host.should eq '127.0.0.1'
     redis_pool.client.db.should eq 2
@@ -147,7 +147,7 @@ describe Redis::EM::Mutex do
   end
 
   before(:all) do
-    @redis_pool = EM::Synchrony::ConnectionPool.new(size: 10) { Redis.new url: 'redis://localhost/1' }
+    @redis_pool = Redis::EM::ConnectionPool.new(size: 10) { Redis.new url: 'redis://localhost/1' }
     @uuid = described_class.class_variable_get(:@@uuid)
   end
 end
