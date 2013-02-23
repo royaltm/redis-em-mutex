@@ -137,7 +137,7 @@ There are 2 different mutex implementations since version 0.3.0.
 * The new "script" handler takes advantage of fast atomic server side operations written in LUA.
   Therefore the "script" handler is compatible only with redis-server 2.6.x and later.
 
-__IMPORTANT__: The pure and script implementations are not compatible. The value they store in semaphore keys are different.
+__IMPORTANT__: The "pure" and "script" implementations are not compatible. The values that each handler stores in semaphore keys have different meaning to them.
 You can not operate on the same set of keys using both handlers from e.g. different applications or application versions.
 See UPGRADING for more info on this.
 
@@ -200,7 +200,9 @@ To detect feature of the current handler:
 
 ### Multi-locks
 
-They enable you to lock more then one key at the same time. The muliti key semaphores are deadlock-safe.
+This feature enables you to lock more then one key at the same time.
+The multi key semaphores are deadlock-safe.
+
 The classic deadlock example scenario with multiple resources:
 
 * A acquires lock on resource :foo
