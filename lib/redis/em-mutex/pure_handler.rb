@@ -136,26 +136,21 @@ class Redis
         # In case of unlocking multiple name semaphore this method returns self only when all
         # of the names have been unlocked successfully.
         def unlock!
-          sem_left = @ns_names.length
-          if (locked_id = @locked_id) && owner_ident(locked_id) == (lock_full_ident = @locked_owner_id)
+          ret = false
+          if (locked_id = @locked_id) && owner_ident(@locked_id) == (lock_full_ident = @locked_owner_id)
             @locked_owner_id = @locked_id = nil
-            @ns_names.each do |name|
-              redis_pool.watch(name) do |r|
-                if r.get(name) == lock_full_ident
-                  if (r.multi {|multi|
-                    multi.del(name)
-                    multi.publish SIGNAL_QUEUE_CHANNEL, @marsh_names if !@multi && Time.now.to_f < locked_id.to_f
-                  })
-                    sem_left -= 1
-                  end
-                else
-                  r.unwatch
+            redis_pool.watch(*@ns_names) do |r|
+              if r.mget(*@ns_names).all? {|v| v == lock_full_ident}
+                ret = !!r.multi do |multi|
+                  multi.del(*@ns_names)
+                  multi.publish SIGNAL_QUEUE_CHANNEL, @marsh_names if Time.now.to_f < locked_id.to_f
                 end
+              else
+                r.unwatch
               end
             end
-            redis_pool.publish SIGNAL_QUEUE_CHANNEL, @marsh_names if @multi && Time.now.to_f < locked_id.to_f
           end
-          sem_left.zero? && self
+          ret && self
         end
 
         # Attempts to grab the lock and waits if it isn't available.
@@ -191,9 +186,10 @@ class Redis
                     owner, exp_id = lock_value.split ' '
                     exp_time = exp_id.to_f
                     expire_time = exp_time if expire_time.nil? || exp_time < expire_time
-                    raise MutexError, "deadlock; recursive locking #{owner}" if owner == ident_match
                     if exp_time < start_time
                       name
+                    elsif owner == ident_match
+                      raise MutexError, "deadlock; recursive locking #{owner}"
                     end
                   end
                 end
