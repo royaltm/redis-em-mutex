@@ -38,7 +38,7 @@ def test2(keys, redis)
   playing = 0
   mutex = RMutex.new(*keys)
   f = Fiber.current
-  (1..100).map {|i| i/100000+0.001}.shuffle.each do |i|
+  (1..100).map {|i| i/100000.0+0.001}.shuffle.each do |i|
     EM::Synchrony.next_tick do
       while running
         playing+=1
