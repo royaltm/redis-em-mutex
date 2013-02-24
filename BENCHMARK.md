@@ -14,11 +14,13 @@ Below are the results of running tests against the following versions:
 To run theese tests type:
 
 ```sh
+cp benchmark_mutex.rb /tmp/
+
 git reset --hard v0.1.2
-ruby benchmark_mutex.rb
+ruby /tmp/benchmark_mutex.rb
 
 git reset --hard v0.2.3
-ruby benchmark_mutex.rb
+ruby /tmp/benchmark_mutex.rb
 
 git reset --hard v0.3.0
 REDIS_EM_MUTEX_HANDLER=pure ruby benchmark_mutex.rb
