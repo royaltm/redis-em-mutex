@@ -1,6 +1,5 @@
 0.3.0
 - fixed: optimized pure handler
-- fixed: rare unlock! race condition
 - added redis/em-connection-pool no more em-synchrony/connection_pool dependency
 - added redis gem dependency updated to 3.0.2
 - added owner_ident specs
@@ -9,7 +8,7 @@
 - added handlers
 
 0.2.3
-- fixed: rare but possible race condition in unlock!
+- fixed: rare unlock! race condition introduced in 0.2.1
   manifesting as deadlock exception when no deadlock should occur
 
 0.2.2
