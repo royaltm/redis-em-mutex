@@ -208,7 +208,7 @@ class Redis
           @@default_expire = value
         end
 
-        # Setup redis database and other defaults
+        # Setup redis database and other defaults.
         # MUST BE called once before any semaphore is created.
         #
         # opts = options Hash:
@@ -217,8 +217,8 @@ class Redis
         #
         # - :connection_pool_class - default is Redis::EM::ConnectionPool
         # - :redis_factory - default is proc {|redis_opts| Redis.new redis_opts }
-        # - :handler - default is ENV['REDIS_EM_MUTEX_HANDLER'] or :auto
-        #     :pure   - client commands based (redis-server >= 2.4)
+        # - :handler - the default value is taken from envronment variable: REDIS_EM_MUTEX_HANDLER or :auto
+        #     :pure   - optimistic locking commands based (redis-server >= 2.4)
         #     :script - server scripting based (redis-server >= 2.6)
         #     :auto   - autodetect and choose best available handler
         # - :expire   - sets global Mutex.default_expire 
