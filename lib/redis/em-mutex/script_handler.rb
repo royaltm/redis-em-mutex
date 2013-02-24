@@ -145,8 +145,7 @@ class Redis
         def unlock!
           if (lock_expire = @lock_expire) && owner_ident == (lock_full_ident = @locked_owner_id)
             @locked_owner_id = @lock_expire = nil
-            removed = eval_safe(@eval_unlock, @ns_names, [lock_full_ident])
-            redis_pool.publish SIGNAL_QUEUE_CHANNEL, @marsh_names if Time.now.to_f < lock_expire
+            removed = eval_safe(@eval_unlock, @ns_names, [lock_full_ident, SIGNAL_QUEUE_CHANNEL, @marsh_names])
           end
           return removed == @ns_names.length && self
         end
@@ -272,7 +271,7 @@ class Redis
             return exp
           EOL
 
-          # * unlock multiple *keys, lock_id
+          # * unlock multiple *keys, lock_id, pub_channel, pub_message
           # * > #keys unlocked
           UNLOCK_MULTI = <<-EOL
             local size=#KEYS
@@ -286,6 +285,7 @@ class Redis
             end
             if #args>0 then
               redis.call('del',unpack(args))
+              redis.call('publish',ARGV[2],ARGV[3])
             end
             return #args
           EOL
@@ -359,17 +359,19 @@ class Redis
             return redis.call('pttl',key)
           EOL
 
-          # * unlock single key, lock_id
+          # * unlock single key, lock_id, pub_channel, pub_message
           # * > 1
           # * > 0
           UNLOCK_SINGLE = <<-EOL
             local key=KEYS[1]
             local res=redis.call('get',key)
             if res==ARGV[1] then
-              return redis.call('del',key)
-            else
-              return 0
+              if 1==redis.call('del',key) then
+                redis.call('publish',ARGV[2],ARGV[3])
+                return 1
+              end
             end
+            return 0
           EOL
 
           # * refresh single key, lock_id, msexpire_at
