@@ -17,7 +17,7 @@ Gem::Specification.new do |s|
   s.rdoc_options << "--title" << "redis-em-mutex" <<
     "--main" << "README.md"
   s.has_rdoc = true
-  s.extra_rdoc_files = ["README.md"]
+  s.extra_rdoc_files = ["README.md", "BENCHMARK.md"]
   s.requirements << "Redis server 2.4+"
   s.add_runtime_dependency "redis", ">= 3.0.2"
   s.add_runtime_dependency "hiredis", "~> 0.4.5"

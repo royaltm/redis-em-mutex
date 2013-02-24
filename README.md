@@ -72,7 +72,7 @@ selected. See more on HANDLERS below.
 
 The "pure" and "script" handlers are not compatible. Two different handlers must not utilize the same semaphore-key space.
 
-Because only the "pure" handler is compatible with redis-em-mutex 0.2.x, when upgrading live production make sure to add
+Because only the "pure" handler is compatible with redis-em-mutex <= 0.2.x, when upgrading live production make sure to add
 `handler: :pure` option to `Redis::EM::Mutex.setup` or set the environment variable on production app servers:
 
 ```sh
@@ -156,7 +156,7 @@ You choose your preferred implementation with `handler` option:
 ```
 
 You may also setup `REDIS_EM_MUTEX_HANDLER` environment variable to preferred implementation name.
-Passing `handler` option to setup method overrides environment variable.
+Passing `handler` option to {Redis::EM::Mutex.setup} overrides environment variable.
 
 The default handler option is `auto` which selects best handler available for your redis-server.
 It's good for quick sandbox setup, however you should set explicitly which handler you require on production.
@@ -165,7 +165,7 @@ The differences:
 
 * Performance. The "script" handler is faster then the "pure" handler.
   The "pure" handler generates twice as much CPU load as "script" handler.
-  See BENCHMARK.md.
+  See {file:BENCHMARK.md BENCHMARK}.
 
 * Expiration. The "script" implementation handler uses PEXPIREAT to mark semaphore life-time.
   The "pure" handler stores semaphore expiry timestamp in key value.

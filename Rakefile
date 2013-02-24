@@ -52,5 +52,5 @@ end
 
 desc "Documentation"
 task :doc do
-  sh "yardoc"
+  sh "yardoc - README.md BENCHMARK.md"
 end
