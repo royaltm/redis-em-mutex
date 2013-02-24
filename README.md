@@ -79,7 +79,7 @@ Because only the "pure" handler is compatible with redis-em-mutex 0.2.x, when up
   REDIS_EM_MUTEX_HANDLER=pure
   export REDIS_EM_MUTEX_HANDLER
 ```
-Upgrading from "pure" to "script" handler requires that all "pure" handler locks MUST BE DELETED from redis-server beforehand.
+Upgrading from "pure" to "script" handler requires that all "pure" handler locks __MUST BE DELETED__ from redis-server beforehand.
 Neglecting that will result in possible deadlocks. The "script" handler assumes that the lock expiration process is handled
 by redis-server's PEXPIREAT feature. The "pure" handler does not set timeouts on keys. It handles expiration differently.
 
@@ -163,13 +163,14 @@ It's good for quick sandbox setup, however you should set explicitly which handl
 
 The differences:
 
-* The "script" handler is at least twice as fast as "pure" handler. It gains even more
-  with multi-locks and during high load. See BENCHMARK.md.
+* Performance. The "script" handler is faster then the "pure" handler.
+  The "pure" handler generates twice as much CPU load as "script" handler.
+  See BENCHMARK.md.
 
-* The "script" implementation handler uses PEXPIREAT to mark semaphore life-time.
+* Expiration. The "script" implementation handler uses PEXPIREAT to mark semaphore life-time.
   The "pure" handler stores semaphore expiry timestamp in key value.
-  Therefore the "script" handler can't refresh semaphores once they are expired.
-  The pure handler on the other hand could refresh expired semaphore but only
+  Therefore the "script" handler can't refresh semaphores once they expire.
+  The "pure" handler on the other hand could refresh expired semaphore but only
   if nothing else has locked on that expired key.
 
 To detect feature of the current handler:
