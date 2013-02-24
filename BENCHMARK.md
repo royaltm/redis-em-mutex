@@ -27,7 +27,7 @@ REDIS_EM_MUTEX_HANDLER=pure ruby benchmark_mutex.rb
 REDIS_EM_MUTEX_HANDLER=script ruby benchmark_mutex.rb
 ```
 
-Here are the results of running those tests on 4 CPU Xeon machine
+Here are the results of running those tests on Quad Core Xeon machine
 with redis-server 2.6.9 and ruby 1.9.3p374 (2013-01-15 revision 38858) [x86_64-linux].
 
 The results may vary.
