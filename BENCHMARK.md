@@ -1,7 +1,7 @@
 BENCHMARK
 =========
 
-To measure the performance of {Redis::EM::Mutex} I've wrote a simple script called `benchmark_mutex.rb`.
+To measure the performance of {Redis::EM::Mutex} I've wrote a simple script called `test/bench.rb`.
 The script is included in respository.
 
 Below are the results of running tests against the following versions:
@@ -14,7 +14,7 @@ Below are the results of running tests against the following versions:
 To run theese tests type:
 
 ```sh
-cp benchmark_mutex.rb /tmp/
+cp test/bench.rb /tmp/benchmark_mutex.rb
 
 git reset --hard v0.1.2
 ruby /tmp/benchmark_mutex.rb
@@ -23,8 +23,8 @@ git reset --hard v0.2.3
 ruby /tmp/benchmark_mutex.rb
 
 git reset --hard v0.3.0
-REDIS_EM_MUTEX_HANDLER=pure ruby benchmark_mutex.rb
-REDIS_EM_MUTEX_HANDLER=script ruby benchmark_mutex.rb
+REDIS_EM_MUTEX_HANDLER=pure ruby test/bench.rb
+REDIS_EM_MUTEX_HANDLER=script ruby test/bench.rb
 ```
 
 Here are the results of running those tests on Quad Core Xeon machine
@@ -131,4 +131,20 @@ keys: 2   5460  1.600000   1.030000   2.630000 (  5.080049)
 keys: 3   5322  1.560000   1.000000   2.560000 (  5.088010)
 keys: 5   4685  1.620000   0.810000   2.430000 (  5.084035)
 keys:10   4347  1.600000   0.770000   2.370000 (  5.111976)
+```
+
+Stress test
+===========
+
+You may also want to try this tool: `test/stress.rb`.
+
+I've adapted it from [mlanett's redis-lock](https://github.com/mlanett/redis-lock/blob/master/test/stress.rb)
+
+```
+Usage: test/stress.rb --forks F --tries T --sleep S
+    -f, --forks FORKS                How many processes to fork
+    -t, --tries TRIES                How many attempts each process should try
+    -s, --sleep SLEEP                How long processes should sleep/work
+    -k, --keys KEYS                  How many keys a process should run through
+    -h, --help                       Display this usage summary
 ```
