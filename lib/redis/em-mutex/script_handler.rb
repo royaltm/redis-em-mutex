@@ -123,8 +123,7 @@ class Redis
 
         # Refreshes lock expiration timeout.
         # Returns `true` if refresh was successfull.
-        # Returns `false` if the semaphore wasn't locked or when it was locked but it has expired
-        # and now it's got a new owner.
+        # Returns `false` if the semaphore wasn't locked or when it was locked but it has expired.
         def refresh(expire_timeout=nil)
           if @lock_expire && owner_ident == (lock_full_ident = @locked_owner_id)
             lock_expire = (Time.now + (expire_timeout.to_f.nonzero? || self.expire_timeout)).to_f
