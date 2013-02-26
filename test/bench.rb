@@ -44,9 +44,8 @@ def test_all(iterator, synchronize, sleeper, counter, concurrency = 10, keysets 
   puts "lock/unlock 1000 times with concurrency: #{concurrency}"
   Benchmark.benchmark(CAPTION, 7, FORMAT) do |x|
     keysets.each do |n|
-      keys = n.times.map { SecureRandom.random_bytes + '.lck' }
       counter.call -counter.call(0)
-      x.report("keys:%2d " % n) { test1(iterator, synchronize[keys], counter, concurrency) }
+      x.report("keys:%2d/%2d " % [n, n*2-1]) { test1(iterator, synchronize[n], counter, concurrency) }
       sleeper.call 1
     end
   end
@@ -56,10 +55,9 @@ def test_all(iterator, synchronize, sleeper, counter, concurrency = 10, keysets 
   Benchmark.benchmark(CAPTION, 8, FORMAT) do |x|
     redis = Redis.new REDIS_OPTIONS
     keysets.each do |n|
-      keys = n.times.map { SecureRandom.random_bytes + '.lck' }
       counter.call -counter.call(0)
-      x.report("keys:%2d " % n) {
-        test2(iterator, synchronize[keys], sleeper, counter, redis)
+      x.report("keys:%2d/%2d " % [n, n*2-1]) {
+        test2(iterator, synchronize[n], sleeper, counter, redis)
         print '%5d' % counter.call(0)
       }
       sleeper.call 1
@@ -93,10 +91,11 @@ EM.synchrony do
     proc do |iter, concurrency, &blk|
       EM::Synchrony::FiberIterator.new(iter, concurrency).each(&blk)
     end,
-    proc do |keys|
-      mutex = RMutex.new(*keys)
+    proc do |n|
+      m = n*2-1
+      keys = m.times.map { SecureRandom.random_bytes + '.lck' }
       proc do |&blk|
-        mutex.synchronize(&blk)
+        RMutex.synchronize(*keys.sample(n), &blk)
       end
     end,
     EM::Synchrony.method(:sleep),
