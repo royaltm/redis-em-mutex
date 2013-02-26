@@ -30,6 +30,11 @@ end
 
 task :test => [:'test:all']
 
+desc "Run stress test WARNING: flushes database on redis-server"
+task :stress do
+  sh "test/stress.rb"
+end
+
 desc "Build the gem"
 task :gem do
   sh "gem build #$gem_name.gemspec"
