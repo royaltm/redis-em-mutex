@@ -4,23 +4,25 @@ task :default => [:test]
 
 $gem_name = "redis-em-mutex"
 
-desc "Run spec tests"
 namespace :test do
 
-  task :all => [:auto, :pure, :script]
+  task :all => [:pure, :script]
 
+  desc "Run specs against auto-detected handler"
   task :auto do
     Dir["spec/#{$gem_name}-*.rb"].each do |spec|
       sh({'REDIS_EM_MUTEX_HANDLER' => nil}, "rspec #{spec}")
     end
   end
 
+  desc "Run specs against pure handler"
   task :pure do
     Dir["spec/#{$gem_name}-*.rb"].each do |spec|
       sh({'REDIS_EM_MUTEX_HANDLER' => 'pure'}, "rspec #{spec}")
     end
   end
 
+  desc "Run specs against script handler"
   task :script do
     Dir["spec/#{$gem_name}-*.rb"].each do |spec|
       sh({'REDIS_EM_MUTEX_HANDLER' => 'script'}, "rspec #{spec}")
@@ -28,6 +30,7 @@ namespace :test do
   end
 end
 
+desc "Run all specs"
 task :test => [:'test:all']
 
 desc "Run stress test WARNING: flushes database on redis-server"
