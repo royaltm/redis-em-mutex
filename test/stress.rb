@@ -1,7 +1,11 @@
 #!/usr/bin/env ruby
+# Author: Mark Lanett - https://github.com/mlanett
+# Origin: https://github.com/mlanett/redis-lock/blob/master/test/stress.rb
+# Adapted for redis-em-mutex by: royaltm
 
 require "bundler/setup"       # set up gem paths
-require "redis-lock"          # load this gem
+require "redis"
+require "redis-em-mutex"      # load this gem
 require "optparse"
 require "ostruct"
 
@@ -12,7 +16,8 @@ options = OpenStruct.new({
   keys:  5
 })
 
-TEST_REDIS = { url: "redis://127.0.0.1:6379/1" }
+TEST_REDIS = { url: "redis://127.0.0.1:6379/1", driver: :synchrony }
+RMutex = ::Redis::EM::Mutex
 
 OptionParser.new do |opts|
   opts.banner = "Usage: #{__FILE__} --forks F --tries T --sleep S"
@@ -36,10 +41,10 @@ class Runner
   end
 
   def test( key, time )
-    redis.lock( key, acquire: time, life: time*2 ) do
+    RMutex.synchronize( key, block: time, expire: time*2 ) do
       val1 = rand(65536)
       redis.set( "#{key}:widget", val1 )
-      Kernel.sleep( time )
+      ::EM::Synchrony.sleep( time )
       val2 = redis.get("#{key}:widget").to_i
       expect( val1, val2 )
     end
@@ -70,9 +75,12 @@ class Runner
   end
 
   def launch
-    Kernel.fork do
-      GC.copy_on_write_friendly = true if ( GC.copy_on_write_friendly? rescue false )
-      run
+    EM.fork_reactor do
+      Fiber.new do
+        GC.copy_on_write_friendly = true if ( GC.copy_on_write_friendly? rescue false )
+        run
+        EM.stop
+      end.resume
     end
   end
 
@@ -89,11 +97,16 @@ end
 
 puts "[#{Process.pid}] Starting with #{options.inspect}"
 
-redis = ::Redis.connect(TEST_REDIS)
-redis.flushall          # clean before run
-redis.client.disconnect # don't keep when forking
+RMutex.setup(TEST_REDIS)
 
-options.forks.times do
-  Runner.new( options ).launch
+EM.synchrony do
+  redis = ::Redis.connect(TEST_REDIS)
+  redis.flushdb           # clean before run
+  redis.client.disconnect # don't keep when forking
+
+  options.forks.times do
+    Runner.new( options ).launch
+  end
+  Process.waitall
+  EM.stop
 end
-Process.waitall
