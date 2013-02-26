@@ -127,13 +127,12 @@ class Redis
         def refresh(expire_timeout=nil)
           if @lock_expire && owner_ident == (lock_full_ident = @locked_owner_id)
             lock_expire = (Time.now + (expire_timeout.to_f.nonzero? || self.expire_timeout)).to_f
-            case keys = eval_safe(@eval_refresh, @ns_names, [lock_full_ident, (lock_expire*1000.0).to_i])
-            when 1
+            !!if 1 == eval_safe(@eval_refresh, @ns_names, [lock_full_ident, (lock_expire*1000.0).to_i])
               @lock_expire = lock_expire
-              return true
             end
+          else
+            false
           end
-          return false
         end
 
         # Releases the lock. Returns self on success.
@@ -175,7 +174,7 @@ class Redis
             ident_match = owner_ident
             loop do
               start_time = Time.now.to_f
-              case timeout = eval_safe(@eval_lock, @ns_names, [ident_match,
+              case timeout = eval_safe(@eval_lock, names, [ident_match,
                 ((lock_expire = (Time.now + expire_timeout).to_f)*1000.0).to_i])
               when 'OK'
                 @locked_owner_id = ident_match
