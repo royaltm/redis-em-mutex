@@ -1,99 +1,157 @@
-$:.unshift "lib"
-gem 'redis', '~>3.0.2'
 require 'securerandom'
 require 'benchmark'
-require 'em-synchrony'
-require 'em-synchrony/fiber_iterator'
-require 'redis-em-mutex'
+require 'minitest/unit'
 
-RMutex = Redis::EM::Mutex
 include Benchmark
+include MiniTest::Assertions
 
-MUTEX_OPTIONS = {
-  expire: 10000,
-  ns: '__Benchmark',
-}
+REDIS_OPTIONS = {}
 
 TEST_KEY = '__TEST__'
 
-def assert(condition)
-  raise "Assertion failed: #{__FILE__}:#{__LINE__}" unless condition
-end
-
 # lock and unlock 1000 times
-def test1(keys, concurrency = 10)
-  count = 0
-  mutex = RMutex.new(*keys)
-  EM::Synchrony::FiberIterator.new((1..1000).to_a, concurrency).each do |i|
-    mutex.synchronize { count+=1 }
+def test1(iterator, synchronize, counter, concurrency = 10)
+  iterator.call((1..1000).to_a, concurrency) do
+    synchronize.call { counter.call }
   end
-  assert(count == 1000)
+  assert_equal(counter.call(0), 1000)
 end
 
 # lock, set, incr, read, del, unlock, sleep as many times as possible in 5 seconds
 # the cooldown period will be included in total time
-def test2(keys, redis)
-  running = true
-  count = 0
-  playing = 0
-  mutex = RMutex.new(*keys)
-  f = Fiber.current
-  (1..100).map {|i| i/100000.0+0.001}.shuffle.each do |i|
-    EM::Synchrony.next_tick do
-      while running
-        playing+=1
-        EM::Synchrony.sleep(i)
-        mutex.synchronize do
-          # print "."
-          value = rand(1000000000000000000)
-          redis.set(TEST_KEY, value)
-          redis.incr(TEST_KEY)
-          assert redis.get(TEST_KEY).to_i == value+1
-          redis.del(TEST_KEY)
-          count += 1
-        end
-        playing-=1
+def test2(iterator, synchronize, sleeper, counter, redis)
+  finish_at = Time.now + 5.0
+  iterator.call((1..100).map {|i| i/100000.0+0.001}.shuffle, 100) do |i|
+    while Time.now - finish_at < 0
+      sleeper.call(i)
+      synchronize.call do
+        # print "."
+        value = rand(1000000000000000000)
+        redis.set(TEST_KEY, value)
+        redis.incr(TEST_KEY)
+        assert_equal redis.get(TEST_KEY).to_i, value+1
+        redis.del(TEST_KEY)
+        counter.call
       end
     end
   end
-  EM::Synchrony.add_timer(5) do
-    running = false
-    # print "0"
-    EM::Synchrony.sleep(0.001) while playing > 0
-    EM.next_tick { f.resume }
-  end
-  Fiber.yield
-  print '%5d' % count
 end
 
-EM.synchrony do
-  concurrency = 10
-  RMutex.setup(MUTEX_OPTIONS) {|opts| opts.size = concurrency}
-  if RMutex.respond_to? :handler
-    puts "Version: #{RMutex::VERSION}, handler: #{RMutex.handler}"
-  else
-    puts "Version: #{RMutex::VERSION}, handler: N/A"
-  end
 
+def test_all(iterator, synchronize, sleeper, counter, concurrency = 10, keysets = [1,2,3,5,10])
   puts "lock/unlock 1000 times with concurrency: #{concurrency}"
   Benchmark.benchmark(CAPTION, 7, FORMAT) do |x|
-    [1,2,3,5,10].each do |n|
+    keysets.each do |n|
       keys = n.times.map { SecureRandom.random_bytes + '.lck' }
-      x.report("keys:%2d " % n) { test1(keys, concurrency) }
-      EM::Synchrony.sleep(1)
+      counter.call -counter.call(0)
+      x.report("keys:%2d " % n) { test1(iterator, synchronize[keys], counter, concurrency) }
+      sleeper.call 1
     end
   end
 
   puts
   puts "lock/write/incr/read/del/unlock in 5 seconds + cooldown period:"
   Benchmark.benchmark(CAPTION, 8, FORMAT) do |x|
-    redis = Redis.new
-    [1,2,3,5,10].each do |n|
+    redis = Redis.new REDIS_OPTIONS
+    keysets.each do |n|
       keys = n.times.map { SecureRandom.random_bytes + '.lck' }
-      x.report("keys:%2d " % n) { test2(keys, redis) }
-      EM::Synchrony.sleep(1)
+      counter.call -counter.call(0)
+      x.report("keys:%2d " % n) {
+        test2(iterator, synchronize[keys], sleeper, counter, redis)
+        print '%5d' % counter.call(0)
+      }
+      sleeper.call 1
     end
   end
+end
+
+$:.unshift "lib"
+gem 'redis', '~>3.0.2'
+require 'em-synchrony'
+require 'em-synchrony/fiber_iterator'
+require 'redis-em-mutex'
+
+REDIS_OPTIONS.replace(driver: :synchrony)
+MUTEX_OPTIONS = {
+  expire: 10000,
+  ns: '__Benchmark',
+}
+
+RMutex = Redis::EM::Mutex
+EM.synchrony do
+  concurrency = 10
+  RMutex.setup(REDIS_OPTIONS.merge(MUTEX_OPTIONS)) {|opts| opts.size = concurrency}
+  if RMutex.respond_to? :handler
+    puts "Version: #{RMutex::VERSION}, handler: #{RMutex.handler}"
+  else
+    puts "Version: #{RMutex::VERSION}, handler: N/A"
+  end
+  counter = 0
+  test_all(
+    proc do |iter, concurrency, &blk|
+      EM::Synchrony::FiberIterator.new(iter, concurrency).each(&blk)
+    end,
+    proc do |keys|
+      mutex = RMutex.new(*keys)
+      proc do |&blk|
+        mutex.synchronize(&blk)
+      end
+    end,
+    EM::Synchrony.method(:sleep),
+    proc do |incr=1|
+      counter+=incr
+    end,
+    concurrency)
   RMutex.stop_watcher(true)
   EM.stop
 end
+
+# #gem 'mlanett-redis-lock', require: 'redis-lock'
+# $:.unshift "../redis-lock/lib"
+# require 'hiredis'
+# require 'redis'
+# require 'redis-lock'
+
+# REDIS_OPTIONS.replace(driver: :hiredis)
+
+# class ThreadIterator
+#   def initialize(iter, concurrency)
+#     @iter = iter
+#     @concurrency = concurrency
+#     @threads = []
+#     @mutex = ::Mutex.new
+#   end
+
+#   def each(&blk)
+#     @threads = @concurrency.times.map do
+#       Thread.new do
+#         while value = @mutex.synchronize { @iter.shift }
+#           blk.call value
+#         end
+#       end
+#     end
+#     @threads.each {|t| t.join}
+#   end
+# end
+
+# concurrency = 10
+# RMutex = Redis
+# counter = 0
+# test_all(
+#   proc do |iter, concurrency, &blk|
+#     ThreadIterator.new(iter, concurrency).each(&blk)
+#   end,
+#   proc do |keys|
+#     mutex = RMutex.new REDIS_OPTIONS
+#     opts = {sleep: 100, acquire: 21, life: 1}
+#     proc do |&blk|
+#       mutex.lock(keys[0], opts, &blk)
+#     end
+#   end,
+#   Kernel.method(:sleep),
+#   proc do |incr=1|
+#     print "\r#{counter}"
+#     counter+=incr
+#   end,
+#   concurrency,
+#   [1])
