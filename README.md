@@ -8,31 +8,35 @@ Author: Rafał Michalski  (mailto:rafal@yeondir.com)
 DESCRIPTION
 -----------
 
-__redis-em-mutex__ is the cross server-process-fiber EventMachine + Redis based semaphore.
+__redis-em-mutex__ is the cross server/process/fiber|owner EventMachine + Redis based semaphore.
 
 FEATURES
 --------
 
-* only for EventMachine
-* no CPU-intensive sleep/polling while waiting for lock to become available
-* fibers waiting for the lock are signalled via Redis channel as soon as the lock
-  has been released (~< 1 ms)
+* EventMachine reactor based
+* carefully designed, well thought out locking pattern
+  (NOT the flawed SETNX/GET/GETSET one from redis documentation page)
+* no CPU-intensive sleep/polling while waiting for lock to become available;
+  fibers waiting for the lock are signalled via Redis channel as soon as the lock
+  is released (~< 1 ms)
 * alternative fast "script" handler (server-side LUA script based - redis-server 2.6.x)
 * multi-locks (all-or-nothing) locking (to prevent possible deadlocks when
   multiple semaphores are required to be locked at once)
 * fiber-safe
 * deadlock detection (only trivial cases: locking twice the same resource from the same owner)
-* mandatory lock expiration (with refreshing)
+* mandatory lock lifetime expiration (with refreshing)
 * macro-style definitions (Mutex::Macro mixin)
 * compatible with Synchrony::Thread::ConditionVariable
 * extendable (beyond fibers) mutex ownership
+* redis HA achievable with [redis-sentinel](http://redis.io/topics/sentinel) and [redis-sentinel](https://github.com/flyerhzm/redis-sentinel) gem.
 
 BUGS/LIMITATIONS
 ----------------
 
 * only for EventMachine
-* NOT thread-safe
-* locking order between concurrent processes is undetermined (no FIFO)
+* NOT thread-safe (not meant to be)
+* locking order between concurrent processes is undetermined (no FIFO between processes)
+  however during {file:BENCHMARK.md BENCHMARKING} no starvation effect was observed.
 * it's not nifty, rather somewhat complicated
 
 REQUIREMENTS
@@ -42,6 +46,8 @@ REQUIREMENTS
 * http://github.com/redis/redis-rb ~> 3.0.2
 * http://rubyeventmachine.com ~> 1.0.0
 * (optional) http://github.com/igrigorik/em-synchrony
+  But due to the redis/synchrony dependency em-synchrony will always be bundled
+  and required.
 
 INSTALL
 -------
@@ -70,7 +76,7 @@ UPGRADING
 To upgrade redis-em-mutex on production from 0.2.x to 0.3.x you must make sure the correct handler has been
 selected. See more on HANDLERS below.
 
-The "pure" and "script" handlers are not compatible. Two different handlers must not utilize the same semaphore-key space.
+The "pure" and "script" handlers are incompatible. Two different handlers must not utilize the same semaphore-key space.
 
 Because only the "pure" handler is compatible with redis-em-mutex <= 0.2.x, when upgrading live production make sure to add
 `handler: :pure` option to `Redis::EM::Mutex.setup` or set the environment variable on production app servers:
@@ -79,6 +85,7 @@ Because only the "pure" handler is compatible with redis-em-mutex <= 0.2.x, when
   REDIS_EM_MUTEX_HANDLER=pure
   export REDIS_EM_MUTEX_HANDLER
 ```
+
 Upgrading from "pure" to "script" handler requires that all "pure" handler locks __MUST BE DELETED__ from redis-server beforehand.
 Neglecting that will result in possible deadlocks. The "script" handler assumes that the lock expiration process is handled
 by redis-server's PEXPIREAT feature. The "pure" handler does not set timeouts on keys. It handles expiration differently.
@@ -137,7 +144,7 @@ There are 2 different mutex implementations since version 0.3.0.
 * The new "script" handler takes advantage of fast atomic server side operations written in LUA.
   Therefore the "script" handler is compatible only with redis-server 2.6.x and later.
 
-__IMPORTANT__: The "pure" and "script" implementations are not compatible. The values that each handler stores in semaphore keys have different meaning to them.
+__IMPORTANT__: The "pure" and "script" implementations are incompatible. The values that each handler stores in semaphore keys have different meaning to them.
 You can not operate on the same set of keys using both handlers from e.g. different applications or application versions.
 See UPGRADING for more info on this.
 
@@ -251,7 +258,7 @@ The classic deadlock example scenario with multiple resources:
 
 ### Macro-style definition
 
-Borrowed from http://github.com/kenn/redis-mutex.
+Idea of macro-style definition was borrowed from http://github.com/kenn/redis-mutex.
 Redis::EM::Mutex::Macro is a mixin which protects selected instance methods of a class with a mutex.
 The locking scope will be Mutex global namespace + class name + method name.
 
@@ -432,25 +439,64 @@ their locked status in parent process will be preserved.
 
 #### Redis factory
 
-Want to use some non-standard redis options or customized client for semaphore watcher and/or redis pool?
-Use `:redis_factory` option then.
+Want to use some non-standard redis options or customized redis client?
+`redis_factory` option to the rescue.
+
+High Availability example setup with redis-sentinel:
 
 ```ruby
+  gem 'redis-sentinel', '~> 1.1.4'
+  require 'redis-em-mutex'
   require 'redis-sentinel'
+  Redis::Client.class_eval do
+    define_method(:sleep) {|n| EM::Synchrony.sleep(n) }
+  end
 
-  Redis::EM::Mutex.setup do |opts|
-    opts.size = 10
-    opts.password = 'password'
-    opts.db = 11
-    opts.redis_factory = proc do |options|
-      Redis.new options.merge(
-        master_name: "my_master",
-        sentinels: [{host: "redis1", port: 6379}, {host: "redis2", port: 6380}])
+  REDIS_OPTS = {password: 'fight or die', db: 1}
+  SENTINEL_OPTS = {
+    master_name: "femto",
+    sentinels: [{host: "wyald", port: 26379}, {host: "zodd", port: 26379}],
+    failover_reconnect_timeout: 30
+  }
+
+  Redis::EM::Mutex.setup(REDIS_OPTS) do |config|
+    config.size = 5                 # redis pool size
+    config.reconnect_max = :forever # reconnect watcher forever
+    config.redis_factory = proc do |opts|
+      Redis.new opts.merge SENTINEL_OPTS
     end
   end
 ```
 
-LICENCE
--------
+ADVOCACY
+--------
 
-The MIT License - Copyright (c) 2012 Rafał Michalski
+Interesting (not eventmachine oriented though) ruby-redis-mutex implementations:
+
+* [mlanett/redis-lock](https://github.com/mlanett/redis-lock)
+  Robust, well thought out and nice to use as it simply adds lock/unlock
+  commands to Redis.
+  Similar concept of locking/unlocking pattern (compared to the "pure" handler)
+  though it uses two redis keys for keeping owner and lifetime expiration separately.
+  "pure" handler stores both in one key, so less redis operations are involved.
+  Blocked lock failure is handled by sleep/polling which involves more cpu load
+  on ruby and redis. You may actually see it by running `time test/stress.rb`
+  tool on both implementations and compare user/sys load.
+
+* [dv/redis-semaphore](https://github.com/dv/redis-semaphore)
+  Very promising experiment. Utilizes BLPOP to provide real FIFO queue of
+  lock acquiring processes. In this way it doesn't need polling nor other means
+  of signaling that the lock is available to those in waiting queue.
+  This one could be used with EM straight out without any patching.
+
+  IMHO the solution has two drawbacks:
+
+  - no lifetime expiration or other means of protection from failure of a lock owner process;
+    still they are trying hard to implement it [now](https://github.com/dv/redis-semaphore/pull/5)
+    and I hope they will succeed.
+
+  - the redis keys are used in an inversed manner: the lack of a key means that the lock is gone.
+    On the contrary, when the lock is being released, the key is created and kept.
+    This is not a problem when you have some static set of keys. However it might be a problem
+    when you need to use lock keys based on random resources and you would need to implement
+    some garbage collector to prevent redis from eating to much memory.
