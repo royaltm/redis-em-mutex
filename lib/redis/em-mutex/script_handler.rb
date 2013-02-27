@@ -254,19 +254,18 @@ class Redis
               return 'OK'
             end
             local res=redis.call('mget',unpack(KEYS))
-            for i=1,size do
-              if res[i]==lock then
-                return 'DD'
-              end
-            end
             exp=nil
-            for i=1,size do
-              res=redis.call('pttl',KEYS[i])
-              if not exp or res<exp then
-                exp=res
+            for i, v in next, res do
+              if v==lock then
+                return 'DD'
+              elseif v then
+                v=redis.call('pttl',KEYS[i])
+                if not exp or v<exp then
+                  exp=v
+                end
               end
             end
-            return exp
+            return exp or -1
           EOL
 
           # * unlock multiple *keys, lock_id, pub_channel, pub_message
