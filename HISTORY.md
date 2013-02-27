@@ -1,3 +1,7 @@
+0.3.1
+- fixed: script handler multi-lock time to wait on failure
+- fixed: bench script randomizes subsets of multi key sets
+
 0.3.0
 - fixed: optimized pure handler
 - added redis/em-connection-pool no more em-synchrony/connection_pool dependency
