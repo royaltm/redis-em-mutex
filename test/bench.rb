@@ -42,7 +42,7 @@ end
 
 def test_all(iterator, synchronize, sleeper, counter, concurrency = 10, keysets = [1,2,3,5,10])
   puts "lock/unlock 1000 times with concurrency: #{concurrency}"
-  Benchmark.benchmark(CAPTION, 7, FORMAT) do |x|
+  Benchmark.benchmark(CAPTION, 15, FORMAT) do |x|
     keysets.each do |n|
       counter.call -counter.call(0)
       x.report("keys:%2d/%2d " % [n, n*2-1]) { test1(iterator, synchronize[n], counter, concurrency) }
@@ -52,13 +52,13 @@ def test_all(iterator, synchronize, sleeper, counter, concurrency = 10, keysets 
 
   puts
   puts "lock/write/incr/read/del/unlock in 5 seconds + cooldown period:"
-  Benchmark.benchmark(CAPTION, 8, FORMAT) do |x|
+  Benchmark.benchmark(CAPTION, 15, FORMAT) do |x|
     redis = Redis.new REDIS_OPTIONS
     keysets.each do |n|
       counter.call -counter.call(0)
-      x.report("keys:%2d/%2d " % [n, n*2-1]) {
+      x.report("keys:%2d/%2d" % [n, n*2-1]) {
         test2(iterator, synchronize[n], sleeper, counter, redis)
-        print '%5d' % counter.call(0)
+        print "\b\b\b\b\b%5d" % counter.call(0)
       }
       sleeper.call 1
     end
