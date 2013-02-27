@@ -59,7 +59,7 @@ $ [sudo] gem install redis-em-mutex
 #### Gemfile
 
 ```ruby
-gem "redis-em-mutex", "~> 0.3.0"
+gem "redis-em-mutex", "~> 0.3.1"
 ```
 
 #### Github
@@ -137,7 +137,7 @@ USAGE
 
 ### Handlers
 
-There are 2 different mutex implementations since version 0.3.0.
+There are 2 different mutex implementations since version 0.3.
 
 * The "pure" classic handler utilizes redis optimistic transaction commands (watch/multi).
   This handler works with redis-server 2.4.x and later.
@@ -190,18 +190,17 @@ To detect feature of the current handler:
 ### Namespaces
 
 ```ruby
-  Redis::EM::Mutex.setup(ns: 'my_namespace')
+  Redis::EM::Mutex.setup(ns: 'Tudor')
 
   # or multiple namespaces:
 
-  ns = Redis::EM::Mutex::NS.new('my_namespace')
+  ns = Redis::EM::Mutex::NS.new('Tudor')
 
   EM.synchrony do
-    ns.synchronize('foo') do
-      # .... do something with foo
+    ns.synchronize('Boscogne') do
+      # .... do something special with Tudor:Boscogne
     end
 
-    # ...
     EM.stop
   end
 ```
@@ -222,7 +221,7 @@ The classic deadlock example scenario with multiple resources:
 ```ruby
   EM.synchrony do
     Redis::EM::Mutex.synchronize('foo', 'bar', 'baz') do
-      # .... do something with foo, bar and baz
+      # .... do something special with foo, bar and baz
     end
 
     # ...
@@ -403,7 +402,7 @@ their locked status in parent process will be preserved.
 
 
 ```ruby
-  mutex = Redis::EM::Mutex.new('resource1', 'resource2', expire: 60)
+  mutex = Redis::EM::Mutex.new('pirkaff', 'roshinu', expire: 60)
 
   EM.synchrony do
     mutex.lock
@@ -471,7 +470,7 @@ High Availability example setup with redis-sentinel:
 ADVOCACY
 --------
 
-Interesting (not eventmachine oriented though) ruby-redis-mutex implementations:
+Interesting (not eventmachine oriented) ruby-redis-mutex implementations:
 
 * [mlanett/redis-lock](https://github.com/mlanett/redis-lock)
   Robust, well thought out and nice to use as it simply adds lock/unlock
