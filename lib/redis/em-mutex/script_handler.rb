@@ -281,8 +281,9 @@ class Redis
               end
             end
             if #args>0 then
-              redis.call('del',unpack(args))
-              redis.call('publish',ARGV[2],ARGV[3])
+              if redis.call('del',unpack(args)) > 0 then
+                redis.call('publish',ARGV[2],ARGV[3])
+              end
             end
             return #args
           EOL
